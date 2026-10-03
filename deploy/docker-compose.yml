@@ -33,6 +33,7 @@ services:
       - IDLE_TIMEOUT_MS=${IDLE_TIMEOUT_MS:-120000}
       - METRICS_INTERVAL_MS=${METRICS_INTERVAL_MS:-1000}
       - NEXT_PUBLIC_WARP_API_BASE=
+      - SETTINGS_FILE=/var/lib/warp-control/settings.json
 
     # 资源限制（可选，按需调整）
     deploy:
@@ -62,9 +63,11 @@ services:
     # volumes:
     #   - ./mdm.xml:/var/lib/cloudflare-warp/mdm.xml:ro
 
-    # WARP 状态持久化（推荐，避免每次重启都重新注册）
+    # WARP 状态 + 运行时配置持久化（推荐，避免每次重启都重新注册/重新配置）
     volumes:
       - warp-state:/var/lib/cloudflare-warp
+      - warp-settings:/var/lib/warp-control
 
 volumes:
   warp-state:
+  warp-settings:

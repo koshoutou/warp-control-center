@@ -182,14 +182,42 @@ function connTypeMeta(type: ConnEvent['type']): { label: string; cls: string } {
 /*  Comparison data                                                    */
 /* ------------------------------------------------------------------ */
 
-const COMPARISON_ROWS: { label: string; original: string; node: string }[] = [
-  { label: '镜像基础大小', original: '~150 MB (debian:bullseye-slim + cloudflare-warp pkg)', node: '~0 MB extra (host warp-svc + ~30 MB Node supervisor)' },
-  { label: '每条连接路径的进程数', original: '2 (socat + warp-svc)', node: '1 (Node proxy → warp-svc)' },
-  { label: '每条连接的 TCP 跳数', original: '2 (client → socat → warp-svc)', node: '1 (client → Node → warp-svc, zero-copy pipe)' },
-  { label: '空闲守护进程 RSS', original: '~110 MB (warp-svc + socat + bash)', node: '~30 MB (Node supervisor only, heap ~4 MB)' },
-  { label: 'socat 依赖', original: '需要', node: '已消除（Node 原生 SOCKS5/HTTP）' },
-  { label: '背压 / 限制', original: '无', node: '最大连接数 + 空闲超时 + ulimit' },
-  { label: '实时监控', original: '无（仅 docker logs）', node: '实时 WebSocket 面板' },
+const COMPARISON_ROWS: { label: string; icon: typeof Boxes; original: { highlight: string; detail: string }; node: { highlight: string; detail: string } }[] = [
+  {
+    label: '镜像基础大小', icon: Boxes,
+    original: { highlight: '~150 MB', detail: 'debian:bullseye-slim + cloudflare-warp pkg' },
+    node: { highlight: '~0 MB', detail: 'host warp-svc + ~30 MB Node supervisor' },
+  },
+  {
+    label: '每条连接路径的进程数', icon: Network,
+    original: { highlight: '2', detail: 'socat + warp-svc' },
+    node: { highlight: '1', detail: 'Node proxy → warp-svc' },
+  },
+  {
+    label: '每条连接的 TCP 跳数', icon: ArrowDownUp,
+    original: { highlight: '2', detail: 'client → socat → warp-svc' },
+    node: { highlight: '1', detail: 'client → Node → warp-svc, zero-copy pipe' },
+  },
+  {
+    label: '空闲守护进程 RSS', icon: MemoryStick,
+    original: { highlight: '~110 MB', detail: 'warp-svc + socat + bash' },
+    node: { highlight: '~30 MB', detail: 'Node supervisor only, heap ~4 MB' },
+  },
+  {
+    label: 'socat 依赖', icon: Boxes,
+    original: { highlight: '需要', detail: '' },
+    node: { highlight: '已消除', detail: 'Node 原生 SOCKS5/HTTP' },
+  },
+  {
+    label: '背压 / 限制', icon: Scale,
+    original: { highlight: '无', detail: '' },
+    node: { highlight: '有', detail: '最大连接数 + 空闲超时 + ulimit' },
+  },
+  {
+    label: '实时监控', icon: Activity,
+    original: { highlight: '无', detail: '仅 docker logs' },
+    node: { highlight: '实时', detail: 'WebSocket 面板' },
+  },
 ]
 
 /* ------------------------------------------------------------------ */
@@ -1693,6 +1721,43 @@ function CommandPalette({
 }
 
 /* ------------------------------------------------------------------ */
+/*  Section: Alert banner                                              */
+/* ------------------------------------------------------------------ */
+
+function AlertBanner({ cpuPct, rssMB }: { cpuPct: number; rssMB: number }) {
+  const alerts: { level: 'warn' | 'error'; msg: string }[] = []
+  if (cpuPct > 80) {
+    alerts.push({ level: 'error', msg: `CPU 使用率过高（${cpuPct.toFixed(1)}%），可能影响代理性能` })
+  } else if (cpuPct > 50) {
+    alerts.push({ level: 'warn', msg: `CPU 使用率偏高（${cpuPct.toFixed(1)}%），建议关注` })
+  }
+  if (rssMB > 200) {
+    alerts.push({ level: 'error', msg: `内存占用过高（${rssMB.toFixed(1)} MB），可能存在泄漏` })
+  } else if (rssMB > 150) {
+    alerts.push({ level: 'warn', msg: `内存占用偏高（${rssMB.toFixed(1)} MB）` })
+  }
+  if (alerts.length === 0) return null
+  return (
+    <div className="flex flex-col gap-1.5">
+      {alerts.map((a, i) => (
+        <div
+          key={i}
+          className={cn(
+            'flex items-center gap-2 rounded-lg border px-4 py-2 text-xs font-medium',
+            a.level === 'error'
+              ? 'border-rose-500/30 bg-rose-500/10 text-rose-200'
+              : 'border-amber-500/30 bg-amber-500/10 text-amber-200'
+          )}
+        >
+          <CircleAlert className={cn('size-3.5 shrink-0', a.level === 'error' ? 'text-rose-400' : 'text-amber-400')} />
+          {a.msg}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
 /*  Section: Comparison                                                 */
 /* ------------------------------------------------------------------ */
 
@@ -1708,27 +1773,36 @@ function ComparisonSection() {
       </p>
 
       <div className="grid grid-cols-1 gap-3">
-        {COMPARISON_ROWS.map((row) => (
-          <div key={row.label} className="rounded-lg border border-white/5 bg-slate-950/40 p-3.5">
-            <div className="mb-2.5 text-xs font-medium uppercase tracking-wider text-slate-400">
-              {row.label}
-            </div>
-            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-              <div className="rounded-md border border-rose-500/20 bg-rose-500/5 p-2.5">
-                <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-rose-300/80">
-                  <Boxes className="size-3 shrink-0" /> 原始版
-                </div>
-                <div className="font-mono text-sm leading-relaxed text-slate-400">{row.original}</div>
+        {COMPARISON_ROWS.map((row) => {
+          const RowIcon = row.icon
+          return (
+            <div key={row.label} className="rounded-lg border border-white/5 bg-slate-950/40 p-3.5">
+              <div className="mb-2.5 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider text-slate-400">
+                <RowIcon className="size-3.5 text-amber-400/70" /> {row.label}
               </div>
-              <div className="rounded-md border border-emerald-500/25 bg-emerald-500/5 p-2.5">
-                <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-emerald-300/90">
-                  <Check className="size-3 shrink-0" /> Node.js 重写版
+              <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                <div className="rounded-md border border-rose-500/20 bg-rose-500/5 p-2.5">
+                  <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-rose-300/80">
+                    <Boxes className="size-3 shrink-0" /> 原始版
+                  </div>
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="font-mono text-base font-bold text-rose-300">{row.original.highlight}</span>
+                    {row.original.detail && <span className="font-mono text-[11px] leading-relaxed text-slate-500">{row.original.detail}</span>}
+                  </div>
                 </div>
-                <div className="font-mono text-sm font-medium leading-relaxed text-emerald-50">{row.node}</div>
+                <div className="rounded-md border border-emerald-500/25 bg-emerald-500/5 p-2.5">
+                  <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-emerald-300/90">
+                    <Check className="size-3 shrink-0" /> Node.js 重写版
+                  </div>
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="font-mono text-base font-bold text-emerald-300">{row.node.highlight}</span>
+                    {row.node.detail && <span className="font-mono text-[11px] leading-relaxed text-emerald-200/60">{row.node.detail}</span>}
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
 
       <p className="mt-4 border-t border-white/5 pt-3 text-[11px] leading-relaxed text-slate-500">
@@ -1967,6 +2041,8 @@ export default function Home() {
               txTotal={proxy?.totalTx ?? 0}
               history={sparkData}
             />
+
+            <AlertBanner cpuPct={proc?.cpuPct ?? 0} rssMB={proc?.rssMB ?? 0} />
 
             <ChartsRow chartData={chartData} timeRange={timeRange} setTimeRange={setTimeRange} />
 
