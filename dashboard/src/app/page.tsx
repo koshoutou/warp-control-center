@@ -11,7 +11,7 @@ import {
   Shield, Globe, Network, MemoryStick, ArrowDownUp, ArrowDown, ArrowUp,
   Power, PowerOff, RefreshCw, Terminal, Trash2, Copy, Check,
   Loader2, Activity, CircleAlert, ChevronDown, Zap, KeyRound,
-  Boxes, Scale, Gauge,
+  Boxes, Scale, Gauge, Download,
 } from 'lucide-react'
 import {
   AreaChart, Area, Line, XAxis, YAxis, CartesianGrid,
@@ -95,6 +95,27 @@ async function copyToClipboard(text: string, label = '已复制') {
   } catch {
     toast.error('剪贴板不可用')
   }
+}
+
+function downloadCSV(filename: string, rows: Record<string, unknown>[]) {
+  if (rows.length === 0) return
+  const headers = Object.keys(rows[0])
+  const csv = [
+    headers.join(','),
+    ...rows.map((r) => headers.map((h) => {
+      const v = r[h]
+      if (v == null) return ''
+      const s = String(v)
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+    }).join(',')),
+  ].join('\n')
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
 /* ------------------------------------------------------------------ */
@@ -251,6 +272,9 @@ function Header({ connected, demo }: { connected: boolean; demo: boolean }) {
             </h1>
             <p className="text-[11px] text-slate-400">
               seiry/cloudflare-warp-proxy 的 Node.js 重写版
+            </p>
+            <p className="hidden text-[10px] text-slate-600 lg:block">
+              快捷键: C 连接 · D 断开 · R 重启 · T 链路
             </p>
           </div>
         </div>
@@ -453,8 +477,16 @@ function ChartsRow({ chartData }: { chartData: { time: string; rss: number; cpu:
             <span className="text-xs text-slate-500">近 5 分钟</span>
           </div>
           <div className="flex items-center gap-3 text-[11px] text-slate-400">
-            <span className="inline-flex items-center gap-1.5"><span className="size-2 rounded-sm bg-amber-500" /> RSS (MB)</span>
-            <span className="inline-flex items-center gap-1.5"><span className="size-2 rounded-sm bg-orange-400" /> CPU (%)</span>
+            <span className="hidden items-center gap-1.5 sm:inline-flex"><span className="size-2 rounded-sm bg-amber-500" /> RSS (MB)</span>
+            <span className="hidden items-center gap-1.5 sm:inline-flex"><span className="size-2 rounded-sm bg-orange-400" /> CPU (%)</span>
+            <button
+              onClick={() => downloadCSV(`warp-metrics-${Date.now()}.csv`, chartData)}
+              disabled={chartData.length === 0}
+              className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/5 px-2 py-1 text-[11px] text-slate-300 transition-colors hover:bg-white/10 disabled:opacity-40 disabled:hover:bg-white/5"
+              title="导出指标历史为 CSV"
+            >
+              <Download className="size-3" /> CSV
+            </button>
           </div>
         </div>
         <div className="h-[240px] w-full">
@@ -827,6 +859,8 @@ function ConnectionsTable({ conns }: { conns: ConnEvent[] }) {
         </div>
       </div>
       <div className="max-h-80 overflow-y-auto rounded-md border border-white/5 [scrollbar-width:thin] [scrollbar-color:#334155_transparent]">
+        {/* 桌面端表格 */}
+        <div className="hidden md:block">
         <Table>
           <TableHeader className="sticky top-0 z-10 bg-slate-900/95 backdrop-blur">
             <TableRow className="border-white/5 hover:bg-transparent">
@@ -871,6 +905,39 @@ function ConnectionsTable({ conns }: { conns: ConnEvent[] }) {
             )}
           </TableBody>
         </Table>
+        </div>
+        {/* 移动端卡片列表 */}
+        <div className="md:hidden divide-y divide-white/5">
+          {rows.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 py-12 text-slate-500">
+              <Network className="size-8 text-slate-700" />
+              <span className="text-xs">暂无连接 — 请将客户端指向代理地址</span>
+              <code className="rounded bg-slate-800/50 px-2 py-0.5 font-mono text-[10px] text-amber-400/80">socks5h://127.0.0.1:40000</code>
+            </div>
+          ) : (
+            rows.map((c, i) => {
+              const m = connTypeMeta(c.type)
+              const target = c.host ? `${c.host}${c.port ? ':' + c.port : ''}` : '—'
+              return (
+                <div key={`m-${c.id}-${i}`} className="p-3">
+                  <div className="mb-1.5 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-xs text-slate-400">#{c.id}</span>
+                      <span className={cn('inline-flex rounded border px-1.5 py-0.5 text-[10px] font-medium', m.cls)}>{m.label}</span>
+                    </div>
+                    <span className="font-mono text-[10px] text-slate-500">{formatDuration(c.durationMs)}</span>
+                  </div>
+                  <div className="mb-1.5 truncate font-mono text-xs text-slate-300">{target}</div>
+                  <div className="flex items-center gap-3 text-[11px]">
+                    <span className="text-emerald-300/80">↓ {c.rx ? formatBytes(c.rx) : '—'}</span>
+                    <span className="text-rose-300/80">↑ {c.tx ? formatBytes(c.tx) : '—'}</span>
+                    {c.reason && <span className="ml-auto truncate text-slate-500">{c.reason}</span>}
+                  </div>
+                </div>
+              )
+            })
+          )}
+        </div>
       </div>
     </Card>
   )
@@ -950,11 +1017,11 @@ function LogStream({ logs, onClear }: { logs: LogLine[]; onClear: () => void }) 
             const m = logLevelMeta(l.level)
             return (
               <div key={i} className="flex items-start gap-2 py-0.5">
-                <span className="shrink-0 text-slate-600">{fmtTime(l.t)}</span>
+                <span className="shrink-0 font-mono text-slate-600">{fmtTime(l.t).slice(0,5)}<span className="sm:inline hidden">{fmtTime(l.t).slice(5)}</span></span>
                 <span className={cn('shrink-0 rounded px-1 text-[10px] font-semibold uppercase', m.bg, m.tag)}>
                   {l.level}
                 </span>
-                <span className="shrink-0 text-slate-500">[{l.cat}]</span>
+                <span className="hidden shrink-0 text-slate-500 sm:inline">[{l.cat}]</span>
                 <span className="break-all text-slate-300">{l.msg}</span>
               </div>
             )
@@ -1217,6 +1284,23 @@ export default function Home() {
     () => chartData.slice(-60).map((d) => ({ rss: d.rss })),
     [chartData],
   )
+
+  // 快捷键：C=连接 D=断开 R=重启 T=测试链路
+  useEffect(() => {
+    if (loading) return
+    const onKey = (e: KeyboardEvent) => {
+      // 忽略输入框中的按键
+      const tag = (e.target as HTMLElement)?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable) return
+      const k = e.key.toLowerCase()
+      if (k === 'c') { e.preventDefault(); connect().catch(() => {}) }
+      else if (k === 'd') { e.preventDefault(); disconnect().catch(() => {}) }
+      else if (k === 'r') { e.preventDefault(); restart().catch(() => {}) }
+      else if (k === 't') { e.preventDefault(); toast.loading('快捷键已触发，请使用面板按钮查看结果', { duration: 1500 }) }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [loading, connect, disconnect, restart])
 
   return (
     <div className="dark flex min-h-screen flex-col bg-slate-950 text-slate-100">
