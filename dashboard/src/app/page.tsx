@@ -77,23 +77,23 @@ function formatDuration(ms?: number): string {
 
 function fmtTime(t: number): string {
   const d = new Date(t)
-  return d.toLocaleTimeString('en-US', { hour12: false })
+  return d.toLocaleTimeString('zh-CN', { hour12: false })
 }
 
 function fmtClock(d: Date): string {
-  return d.toLocaleTimeString('en-US', { hour12: false })
+  return d.toLocaleTimeString('zh-CN', { hour12: false })
 }
 
 function capitalize(s: string): string {
   return s ? s.charAt(0).toUpperCase() + s.slice(1) : s
 }
 
-async function copyToClipboard(text: string, label = 'Copied') {
+async function copyToClipboard(text: string, label = '已复制') {
   try {
     await navigator.clipboard.writeText(text)
     toast.success(label, { description: text })
   } catch {
-    toast.error('Clipboard unavailable')
+    toast.error('剪贴板不可用')
   }
 }
 
@@ -112,17 +112,17 @@ interface StateMeta {
 function warpStateMeta(state: WarpState | string | undefined): StateMeta {
   switch (state) {
     case 'connected':
-      return { label: 'Connected', color: 'text-emerald-400', dot: 'bg-emerald-400', ring: 'ring-emerald-500/30', glow: 'shadow-emerald-500/10' }
+      return { label: '已连接', color: 'text-emerald-400', dot: 'bg-emerald-400', ring: 'ring-emerald-500/30', glow: 'shadow-emerald-500/10' }
     case 'connecting':
-      return { label: 'Connecting', color: 'text-amber-400', dot: 'bg-amber-400', ring: 'ring-amber-500/30', glow: 'shadow-amber-500/10' }
+      return { label: '连接中', color: 'text-amber-400', dot: 'bg-amber-400', ring: 'ring-amber-500/30', glow: 'shadow-amber-500/10' }
     case 'disconnected':
-      return { label: 'Disconnected', color: 'text-slate-300', dot: 'bg-slate-500', ring: 'ring-slate-500/30', glow: '' }
+      return { label: '已断开', color: 'text-slate-300', dot: 'bg-slate-500', ring: 'ring-slate-500/30', glow: '' }
     case 'error':
-      return { label: 'Error', color: 'text-rose-400', dot: 'bg-rose-500', ring: 'ring-rose-500/30', glow: 'shadow-rose-500/10' }
+      return { label: '错误', color: 'text-rose-400', dot: 'bg-rose-500', ring: 'ring-rose-500/30', glow: 'shadow-rose-500/10' }
     case 'demo':
-      return { label: 'Demo', color: 'text-amber-400', dot: 'bg-amber-400', ring: 'ring-amber-500/30', glow: 'shadow-amber-500/10' }
+      return { label: '演示', color: 'text-amber-400', dot: 'bg-amber-400', ring: 'ring-amber-500/30', glow: 'shadow-amber-500/10' }
     default:
-      return { label: 'Unknown', color: 'text-slate-500', dot: 'bg-slate-600', ring: 'ring-slate-500/20', glow: '' }
+      return { label: '未知', color: 'text-slate-500', dot: 'bg-slate-600', ring: 'ring-slate-500/20', glow: '' }
   }
 }
 
@@ -138,9 +138,9 @@ function logLevelMeta(level: LogLevel): { tag: string; bg: string } {
 
 function connTypeMeta(type: ConnEvent['type']): { label: string; cls: string } {
   switch (type) {
-    case 'open': return { label: 'OPEN', cls: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' }
-    case 'close': return { label: 'CLOSE', cls: 'border-slate-500/30 bg-slate-500/10 text-slate-300' }
-    case 'error': return { label: 'ERROR', cls: 'border-rose-500/30 bg-rose-500/10 text-rose-300' }
+    case 'open': return { label: '开启', cls: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' }
+    case 'close': return { label: '关闭', cls: 'border-slate-500/30 bg-slate-500/10 text-slate-300' }
+    case 'error': return { label: '错误', cls: 'border-rose-500/30 bg-rose-500/10 text-rose-300' }
     default: return { label: '—', cls: 'border-slate-500/30 bg-slate-500/10 text-slate-300' }
   }
 }
@@ -150,13 +150,13 @@ function connTypeMeta(type: ConnEvent['type']): { label: string; cls: string } {
 /* ------------------------------------------------------------------ */
 
 const COMPARISON_ROWS: { label: string; original: string; node: string }[] = [
-  { label: 'Image base size', original: '~150 MB (debian:bullseye-slim + cloudflare-warp pkg)', node: '~0 MB extra (host warp-svc + ~30 MB Node supervisor)' },
-  { label: 'Processes per connection path', original: '2 (socat + warp-svc)', node: '1 (Node proxy → warp-svc)' },
-  { label: 'TCP hops per connection', original: '2 (client → socat → warp-svc)', node: '1 (client → Node → warp-svc, zero-copy pipe)' },
-  { label: 'Idle supervisor RSS', original: '~110 MB (warp-svc + socat + bash)', node: '~30 MB (Node supervisor only, heap ~4 MB)' },
-  { label: 'socat dependency', original: 'required', node: 'eliminated (native SOCKS5/HTTP in Node)' },
-  { label: 'Backpressure / limits', original: 'none', node: 'maxConnections + idleTimeout + ulimits' },
-  { label: 'Real-time monitoring', original: 'none (docker logs only)', node: 'live WebSocket dashboard' },
+  { label: '镜像基础大小', original: '~150 MB (debian:bullseye-slim + cloudflare-warp pkg)', node: '~0 MB extra (host warp-svc + ~30 MB Node supervisor)' },
+  { label: '每条连接路径的进程数', original: '2 (socat + warp-svc)', node: '1 (Node proxy → warp-svc)' },
+  { label: '每条连接的 TCP 跳数', original: '2 (client → socat → warp-svc)', node: '1 (client → Node → warp-svc, zero-copy pipe)' },
+  { label: '空闲守护进程 RSS', original: '~110 MB (warp-svc + socat + bash)', node: '~30 MB (Node supervisor only, heap ~4 MB)' },
+  { label: 'socat 依赖', original: '需要', node: '已消除（Node 原生 SOCKS5/HTTP）' },
+  { label: '背压 / 限制', original: '无', node: '最大连接数 + 空闲超时 + ulimit' },
+  { label: '实时监控', original: '无（仅 docker logs）', node: '实时 WebSocket 面板' },
 ]
 
 /* ------------------------------------------------------------------ */
@@ -185,7 +185,7 @@ function WsPill({ connected }: { connected: boolean }) {
       )}
     >
       <LiveDot on={connected} />
-      {connected ? 'LIVE' : 'connecting…'}
+      {connected ? '实时' : '连接中…'}
     </span>
   )
 }
@@ -196,16 +196,16 @@ function ModeBadge({ demo }: { demo: boolean }) {
       <UiTooltip>
         <TooltipTrigger asChild>
           <span className="inline-flex cursor-help items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-[11px] font-medium text-amber-300">
-            <CircleAlert className="size-3" /> DEMO MODE
+            <CircleAlert className="size-3" /> 演示模式
           </span>
         </TooltipTrigger>
-        <TooltipContent>warp-svc not installed on this host</TooltipContent>
+        <TooltipContent>此主机上 warp-svc 不可用</TooltipContent>
       </UiTooltip>
     )
   }
   return (
     <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-medium text-emerald-300">
-      <span className="size-1.5 rounded-full bg-emerald-400" /> LIVE
+      <span className="size-1.5 rounded-full bg-emerald-400" /> 实时
     </span>
   )
 }
@@ -247,10 +247,10 @@ function Header({ connected, demo }: { connected: boolean; demo: boolean }) {
           </div>
           <div className="leading-tight">
             <h1 className="text-sm font-semibold text-slate-50 sm:text-base">
-              WARP Control Center
+              WARP 控制中心
             </h1>
             <p className="text-[11px] text-slate-400">
-              Node.js rewrite of seiry/cloudflare-warp-proxy
+              seiry/cloudflare-warp-proxy 的 Node.js 重写版
             </p>
           </div>
         </div>
@@ -339,47 +339,47 @@ function KpiRow({
   return (
     <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
       <KpiCard
-        title="WARP State"
+        title="WARP 状态"
         icon={Globe}
         iconClass={cn('ring-1', meta.ring, 'bg-amber-500/10 text-amber-400')}
         value={<span className={meta.color}>{meta.label}</span>}
         sub={
           warpDemo
-            ? 'demo mode — warp-svc unavailable'
+            ? '演示模式 — warp-svc 不可用'
             : warpState === 'error' && warpLastError
               ? warpLastError
               : [
                   warpVersion && `v${warpVersion}`,
-                  warpRunning ? 'running' : 'stopped',
+                  warpRunning ? '运行中' : '已停止',
                   warpPid && `pid ${warpPid}`,
-                ].filter(Boolean).join(' · ') || 'idle'
+                ].filter(Boolean).join(' · ') || '空闲'
         }
         glow={meta.glow}
       />
       <KpiCard
-        title="Active Connections"
+        title="活动连接"
         icon={Network}
         iconClass="bg-amber-500/10 text-amber-400 ring-1 ring-amber-500/20"
         value={connsActive}
         sub={
           <span className="flex gap-3">
-            <span>{connsTotal} total</span>
-            {connsRejected > 0 && <span className="text-rose-400">{connsRejected} rejected</span>}
+            <span>{connsTotal} 总计</span>
+            {connsRejected > 0 && <span className="text-rose-400">{connsRejected} 已拒绝</span>}
           </span>
         }
         pulse={connsActive > 0}
       />
       <KpiCard
-        title="Memory (RSS)"
+        title="内存 (RSS)"
         icon={MemoryStick}
         iconClass="bg-orange-500/10 text-orange-400 ring-1 ring-orange-500/20"
         value={`${rssMB.toFixed(1)} MB`}
-        sub={`heap ${heapUsed.toFixed(1)} / ${heapTotal.toFixed(1)} MB`}
+        sub={`堆 ${heapUsed.toFixed(1)} / ${heapTotal.toFixed(1)} MB`}
       >
         {history.length > 1 && <Sparkline data={history} dataKey="rss" color="#f59e0b" />}
       </KpiCard>
       <KpiCard
-        title="Throughput"
+        title="吞吐量"
         icon={ArrowDownUp}
         iconClass="bg-amber-500/10 text-amber-400 ring-1 ring-amber-500/20"
         value={
@@ -424,8 +424,8 @@ function ChartsRow({ chartData }: { chartData: { time: string; rss: number; cpu:
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Activity className="size-4 text-amber-400" />
-            <h2 className="text-sm font-semibold text-slate-100">Resource Usage</h2>
-            <span className="text-xs text-slate-500">last 5 min</span>
+            <h2 className="text-sm font-semibold text-slate-100">资源使用</h2>
+            <span className="text-xs text-slate-500">近 5 分钟</span>
           </div>
           <div className="flex items-center gap-3 text-[11px] text-slate-400">
             <span className="inline-flex items-center gap-1.5"><span className="size-2 rounded-sm bg-amber-500" /> RSS (MB)</span>
@@ -436,7 +436,7 @@ function ChartsRow({ chartData }: { chartData: { time: string; rss: number; cpu:
           {empty ? (
             <div className="grid h-full place-items-center text-xs text-slate-500">
               <span className="flex items-center gap-2">
-                <Loader2 className="size-3.5 animate-spin" /> waiting for telemetry…
+                <Loader2 className="size-3.5 animate-spin" /> 等待遥测数据…
               </span>
             </div>
           ) : (
@@ -465,18 +465,18 @@ function ChartsRow({ chartData }: { chartData: { time: string; rss: number; cpu:
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <ArrowDownUp className="size-4 text-amber-400" />
-            <h2 className="text-sm font-semibold text-slate-100">Throughput</h2>
+            <h2 className="text-sm font-semibold text-slate-100">吞吐量</h2>
           </div>
           <div className="flex items-center gap-3 text-[11px] text-slate-400">
-            <span className="inline-flex items-center gap-1.5"><span className="size-2 rounded-sm bg-amber-500" /> ↓ RX</span>
-            <span className="inline-flex items-center gap-1.5"><span className="size-2 rounded-sm bg-rose-500" /> ↑ TX</span>
+            <span className="inline-flex items-center gap-1.5"><span className="size-2 rounded-sm bg-amber-500" /> ↓ 接收</span>
+            <span className="inline-flex items-center gap-1.5"><span className="size-2 rounded-sm bg-rose-500" /> ↑ 发送</span>
           </div>
         </div>
         <div className="h-[240px] w-full">
           {empty ? (
             <div className="grid h-full place-items-center text-xs text-slate-500">
               <span className="flex items-center gap-2">
-                <Loader2 className="size-3.5 animate-spin" /> waiting for telemetry…
+                <Loader2 className="size-3.5 animate-spin" /> 等待遥测数据…
               </span>
             </div>
           ) : (
@@ -501,8 +501,8 @@ function ChartsRow({ chartData }: { chartData: { time: string; rss: number; cpu:
                   itemStyle={{ color: '#e2e8f0' }}
                   formatter={(value: number | string, name: string) => [formatRate(Number(value)), name]}
                 />
-                <Area type="monotone" dataKey="rx" name="↓ RX" stroke="#f59e0b" strokeWidth={2} fill="url(#rxArea)" isAnimationActive={false} />
-                <Area type="monotone" dataKey="tx" name="↑ TX" stroke="#f43f5e" strokeWidth={2} fill="url(#txArea)" isAnimationActive={false} />
+                <Area type="monotone" dataKey="rx" name="↓ 接收" stroke="#f59e0b" strokeWidth={2} fill="url(#rxArea)" isAnimationActive={false} />
+                <Area type="monotone" dataKey="tx" name="↑ 发送" stroke="#f43f5e" strokeWidth={2} fill="url(#txArea)" isAnimationActive={false} />
               </AreaChart>
             </ResponsiveContainer>
           )}
@@ -539,9 +539,9 @@ function WarpControlPanel({
     const t = toast.loading(`${label}…`)
     try {
       await fn()
-      toast.success(`${label} dispatched`, { id: t })
+      toast.success(`${label} 已派发`, { id: t })
     } catch (e) {
-      toast.error(`${label} failed: ${(e as Error).message}`, { id: t })
+      toast.error(`${label} 失败：${(e as Error).message}`, { id: t })
     } finally {
       setBusy(null)
     }
@@ -549,15 +549,15 @@ function WarpControlPanel({
 
   const handleTrace = useCallback(async () => {
     setBusy('trace')
-    const t = toast.loading('Running trace…')
+    const t = toast.loading('正在执行链路测试…')
     try {
       const r = await trace()
       setTraceResult(r)
       setTraceOpen(true)
-      if (r?.ok) toast.success('Trace complete', { id: t })
-      else toast.warning('Trace returned — check output', { id: t })
+      if (r?.ok) toast.success('链路测试完成', { id: t })
+      else toast.warning('链路返回 — 请检查输出', { id: t })
     } catch (e) {
-      toast.error(`Trace failed: ${(e as Error).message}`, { id: t })
+      toast.error(`链路测试失败：${(e as Error).message}`, { id: t })
     } finally {
       setBusy(null)
     }
@@ -565,17 +565,17 @@ function WarpControlPanel({
 
   const handleRegister = useCallback(async () => {
     if (!license.trim()) {
-      toast.error('Enter a license key first')
+      toast.error('请先输入许可证密钥')
       return
     }
     setBusy('register')
-    const t = toast.loading('Registering with license…')
+    const t = toast.loading('正在使用许可证注册…')
     try {
       await register(license.trim())
-      toast.success('Registration dispatched', { id: t })
+      toast.success('注册指令已派发', { id: t })
       setLicense('')
     } catch (e) {
-      toast.error(`Register failed: ${(e as Error).message}`, { id: t })
+      toast.error(`注册失败：${(e as Error).message}`, { id: t })
     } finally {
       setBusy(null)
     }
@@ -585,40 +585,40 @@ function WarpControlPanel({
     <Card className="flex h-full flex-col gap-4 rounded-xl border-white/5 bg-slate-900/60 p-5 shadow-lg shadow-black/20">
       <div className="flex items-center gap-2">
         <Power className="size-4 text-amber-400" />
-        <h2 className="text-sm font-semibold text-slate-100">WARP Control</h2>
+        <h2 className="text-sm font-semibold text-slate-100">WARP 控制</h2>
         {warpDemo && (
           <Badge variant="outline" className="ml-auto border-amber-500/30 bg-amber-500/10 text-[10px] text-amber-300">
-            demo
+            演示
           </Badge>
         )}
       </div>
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <Button
-          onClick={() => run('connect', 'Connect', connect)}
+          onClick={() => run('connect', '连接 WARP', connect)}
           disabled={busy !== null}
           className="bg-emerald-600 text-white hover:bg-emerald-500"
         >
           {busy === 'connect' ? <Loader2 className="size-4 animate-spin" /> : <Power className="size-4" />}
-          Connect
+          连接
         </Button>
         <Button
-          onClick={() => run('disconnect', 'Disconnect', disconnect)}
+          onClick={() => run('disconnect', '断开 WARP', disconnect)}
           disabled={busy !== null}
           variant="secondary"
           className="bg-slate-700 text-slate-100 hover:bg-slate-600"
         >
           {busy === 'disconnect' ? <Loader2 className="size-4 animate-spin" /> : <PowerOff className="size-4" />}
-          Disconnect
+          断开
         </Button>
         <Button
-          onClick={() => run('restart', 'Restart', restart)}
+          onClick={() => run('restart', '重启 WARP', restart)}
           disabled={busy !== null}
           variant="outline"
           className="border-amber-500/40 bg-amber-500/5 text-amber-300 hover:bg-amber-500/10"
         >
           {busy === 'restart' ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
-          Restart
+          重启
         </Button>
         <Button
           onClick={handleTrace}
@@ -627,7 +627,7 @@ function WarpControlPanel({
           className="border-white/10 bg-white/5 text-slate-200 hover:bg-white/10"
         >
           {busy === 'trace' ? <Loader2 className="size-4 animate-spin" /> : <Terminal className="size-4" />}
-          Test trace
+          测试链路
         </Button>
       </div>
 
@@ -635,7 +635,7 @@ function WarpControlPanel({
 
       <div className="space-y-2">
         <Label htmlFor="license" className="text-xs text-slate-400">
-          <KeyRound className="mr-1 inline size-3.5" /> License key (optional)
+          <KeyRound className="mr-1 inline size-3.5" /> 许可证密钥（可选）
         </Label>
         <div className="flex gap-2">
           <Input
@@ -654,7 +654,7 @@ function WarpControlPanel({
             className="border-amber-500/40 bg-amber-500/5 text-amber-300 hover:bg-amber-500/10"
           >
             {busy === 'register' ? <Loader2 className="size-4 animate-spin" /> : <Zap className="size-4" />}
-            Register
+            注册
           </Button>
         </div>
       </div>
@@ -662,13 +662,13 @@ function WarpControlPanel({
       <Collapsible open={traceOpen} onOpenChange={setTraceOpen} className="mt-auto">
         <CollapsibleTrigger className="flex w-full items-center justify-between rounded-md border border-white/5 bg-slate-950/40 px-3 py-2 text-xs text-slate-300 hover:bg-slate-950/60">
           <span className="flex items-center gap-2">
-            <Terminal className="size-3.5 text-amber-400" /> Trace output
+            <Terminal className="size-3.5 text-amber-400" /> 链路输出
           </span>
           <ChevronDown className={cn('size-3.5 transition-transform', traceOpen && 'rotate-180')} />
         </CollapsibleTrigger>
         <CollapsibleContent>
           <pre className="mt-2 max-h-48 overflow-auto rounded-md border border-white/5 bg-slate-950/80 p-3 font-mono text-[11px] leading-relaxed text-slate-300">
-            {traceResult?.trace ?? traceResult?.warp ?? (traceResult ? '(empty trace)' : 'Run "Test trace" to see the Cloudflare trace output.')}
+            {traceResult?.trace ?? traceResult?.warp ?? (traceResult ? '(空链路)' : '运行“测试链路”以查看 Cloudflare 链路输出。')}
           </pre>
         </CollapsibleContent>
       </Collapsible>
@@ -711,23 +711,23 @@ function ConfigPanel({
 }) {
   const rows: ConfigRow[] = config
     ? [
-        { key: 'proxyPort', label: 'Proxy listen port', kind: 'port', value: config.proxyPort },
-        { key: 'controlPort', label: 'Control port', kind: 'port', value: config.controlPort },
-        { key: 'upstream', label: 'Upstream', kind: 'mono', value: `${config.upstreamHost}:${config.upstreamPort}` },
-        { key: 'warpSvc', label: 'warp-svc path', kind: 'muted', value: config.warpSvcPath || '—' },
-        { key: 'warpCli', label: 'warp-cli path', kind: 'muted', value: config.warpCliPath || '—' },
-        { key: 'mode', label: 'Mode', kind: 'text', value: config.mode },
-        { key: 'license', label: 'License configured', kind: 'bool', value: config.licenseConfigured },
+        { key: 'proxyPort', label: '代理监听端口', kind: 'port', value: config.proxyPort },
+        { key: 'controlPort', label: '控制端口', kind: 'port', value: config.controlPort },
+        { key: 'upstream', label: '上游', kind: 'mono', value: `${config.upstreamHost}:${config.upstreamPort}` },
+        { key: 'warpSvc', label: 'warp-svc 路径', kind: 'muted', value: config.warpSvcPath || '—' },
+        { key: 'warpCli', label: 'warp-cli 路径', kind: 'muted', value: config.warpCliPath || '—' },
+        { key: 'mode', label: '模式', kind: 'text', value: config.mode },
+        { key: 'license', label: '许可证已配置', kind: 'bool', value: config.licenseConfigured },
         ...(warp
           ? ([
-              { key: 'warpSvcInstalled', label: 'warp-svc installed', kind: 'bool' as ConfigRowKind, value: warp.installed },
-              { key: 'warpCliInstalled', label: 'warp-cli installed', kind: 'bool' as ConfigRowKind, value: warp.cliInstalled },
-              { key: 'warpMode', label: 'WARP mode', kind: 'text' as ConfigRowKind, value: warp.mode || '—' },
-              { key: 'warpPort', label: 'WARP proxy port', kind: 'port' as ConfigRowKind, value: warp.port },
+              { key: 'warpSvcInstalled', label: 'warp-svc 已安装', kind: 'bool' as ConfigRowKind, value: warp.installed },
+              { key: 'warpCliInstalled', label: 'warp-cli 已安装', kind: 'bool' as ConfigRowKind, value: warp.cliInstalled },
+              { key: 'warpMode', label: 'WARP 模式', kind: 'text' as ConfigRowKind, value: warp.mode || '—' },
+              { key: 'warpPort', label: 'WARP 代理端口', kind: 'port' as ConfigRowKind, value: warp.port },
               ...(warp.pid
                 ? [{ key: 'warpPid', label: 'warp-svc pid', kind: 'muted' as ConfigRowKind, value: warp.pid }]
                 : []),
-              { key: 'lastChecked', label: 'Last checked', kind: 'muted' as ConfigRowKind, value: fmtTime(warp.lastChecked) },
+              { key: 'lastChecked', label: '最后检查', kind: 'muted' as ConfigRowKind, value: fmtTime(warp.lastChecked) },
             ] as ConfigRow[])
           : []),
       ]
@@ -740,8 +740,8 @@ function ConfigPanel({
       case 'muted': return <span className="text-slate-400">{String(row.value)}</span>
       case 'text': return <span className="text-slate-200">{String(row.value)}</span>
       case 'bool': return row.value
-        ? <span className="text-emerald-300">yes</span>
-        : <span className="text-slate-500">no</span>
+        ? <span className="text-emerald-300">是</span>
+        : <span className="text-slate-500">否</span>
       default: return <span className="text-slate-400">{String(row.value)}</span>
     }
   }
@@ -750,7 +750,7 @@ function ConfigPanel({
     <Card className="flex h-full flex-col gap-4 rounded-xl border-white/5 bg-slate-900/60 p-5 shadow-lg shadow-black/20">
       <div className="flex items-center gap-2">
         <Gauge className="size-4 text-amber-400" />
-        <h2 className="text-sm font-semibold text-slate-100">Configuration</h2>
+        <h2 className="text-sm font-semibold text-slate-100">配置</h2>
       </div>
 
       <dl className="grid grid-cols-1 gap-x-4 gap-y-2 font-mono text-xs sm:grid-cols-2">
@@ -765,21 +765,21 @@ function ConfigPanel({
       <Separator className="bg-white/5" />
 
       <div className="mt-auto space-y-2">
-        <Label className="text-xs text-slate-400">Proxy URL</Label>
+        <Label className="text-xs text-slate-400">代理地址</Label>
         <div className="flex items-center gap-2 rounded-md border border-amber-500/20 bg-amber-500/5 px-3 py-2">
           <code className="flex-1 truncate font-mono text-xs text-amber-200">{proxyUrl}</code>
           <Button
             size="icon"
             variant="ghost"
             className="size-7 text-slate-400 hover:bg-white/5 hover:text-slate-200"
-            onClick={() => copyToClipboard(proxyUrl, 'Proxy URL copied')}
-            aria-label="Copy proxy URL"
+            onClick={() => copyToClipboard(proxyUrl, '代理地址已复制')}
+            aria-label="复制代理地址"
           >
             <Copy className="size-3.5" />
           </Button>
         </div>
         <p className="text-[11px] text-slate-500">
-          Point any SOCKS5- or HTTP-CONNECT-aware client at this URL.
+          将任何支持 SOCKS5 或 HTTP CONNECT 的客户端指向此地址。
         </p>
       </div>
     </Card>
@@ -797,8 +797,8 @@ function ConnectionsTable({ conns }: { conns: ConnEvent[] }) {
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Network className="size-4 text-amber-400" />
-          <h2 className="text-sm font-semibold text-slate-100">Recent Connections</h2>
-          <span className="text-xs text-slate-500">{conns.length} event{conns.length === 1 ? '' : 's'}</span>
+          <h2 className="text-sm font-semibold text-slate-100">最近连接</h2>
+          <span className="text-xs text-slate-500">{conns.length} 条事件</span>
         </div>
       </div>
       <div className="max-h-80 overflow-y-auto rounded-md border border-white/5 [scrollbar-width:thin] [scrollbar-color:#334155_transparent]">
@@ -806,19 +806,19 @@ function ConnectionsTable({ conns }: { conns: ConnEvent[] }) {
           <TableHeader className="sticky top-0 z-10 bg-slate-900/95 backdrop-blur">
             <TableRow className="border-white/5 hover:bg-transparent">
               <TableHead className="h-9 pl-3 text-[11px] uppercase tracking-wider text-slate-500">ID</TableHead>
-              <TableHead className="h-9 text-[11px] uppercase tracking-wider text-slate-500">Type</TableHead>
-              <TableHead className="h-9 text-[11px] uppercase tracking-wider text-slate-500">Target</TableHead>
-              <TableHead className="h-9 text-right text-[11px] uppercase tracking-wider text-slate-500">↓ RX</TableHead>
-              <TableHead className="h-9 text-right text-[11px] uppercase tracking-wider text-slate-500">↑ TX</TableHead>
-              <TableHead className="h-9 text-right text-[11px] uppercase tracking-wider text-slate-500">Duration</TableHead>
-              <TableHead className="h-9 pr-3 text-[11px] uppercase tracking-wider text-slate-500">Reason</TableHead>
+              <TableHead className="h-9 text-[11px] uppercase tracking-wider text-slate-500">类型</TableHead>
+              <TableHead className="h-9 text-[11px] uppercase tracking-wider text-slate-500">目标</TableHead>
+              <TableHead className="h-9 text-right text-[11px] uppercase tracking-wider text-slate-500">↓ 接收</TableHead>
+              <TableHead className="h-9 text-right text-[11px] uppercase tracking-wider text-slate-500">↑ 发送</TableHead>
+              <TableHead className="h-9 text-right text-[11px] uppercase tracking-wider text-slate-500">持续时间</TableHead>
+              <TableHead className="h-9 pr-3 text-[11px] uppercase tracking-wider text-slate-500">原因</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {rows.length === 0 ? (
               <TableRow className="border-transparent hover:bg-transparent">
                 <TableCell colSpan={7} className="h-28 text-center text-xs text-slate-500">
-                  No connections yet — point a client at the proxy URL.
+                  暂无连接 — 请将客户端指向代理地址。
                 </TableCell>
               </TableRow>
             ) : (
@@ -875,8 +875,8 @@ function LogStream({ logs, onClear }: { logs: LogLine[]; onClear: () => void }) 
       <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Terminal className="size-4 text-amber-400" />
-          <h2 className="text-sm font-semibold text-slate-100">Log Stream</h2>
-          <span className="text-xs text-slate-500">{logs.length} line{logs.length === 1 ? '' : 's'}</span>
+          <h2 className="text-sm font-semibold text-slate-100">日志流</h2>
+          <span className="text-xs text-slate-500">{logs.length} 行</span>
         </div>
         <Button
           size="sm"
@@ -884,7 +884,7 @@ function LogStream({ logs, onClear }: { logs: LogLine[]; onClear: () => void }) 
           onClick={onClear}
           className="h-7 text-xs text-slate-400 hover:bg-white/5 hover:text-slate-200"
         >
-          <Trash2 className="size-3.5" /> Clear
+          <Trash2 className="size-3.5" /> 清空
         </Button>
       </div>
       <div
@@ -894,7 +894,7 @@ function LogStream({ logs, onClear }: { logs: LogLine[]; onClear: () => void }) 
       >
         {logs.length === 0 ? (
           <div className="grid h-24 place-items-center text-xs text-slate-600">
-            No logs yet.
+            暂无日志。
           </div>
         ) : (
           logs.map((l, i) => {
@@ -925,10 +925,10 @@ function ComparisonSection() {
     <Card className="rounded-xl border-amber-500/15 bg-gradient-to-br from-slate-900/80 to-slate-900/40 p-5 shadow-lg shadow-black/20 ring-1 ring-amber-500/10">
       <div className="mb-1 flex items-center gap-2">
         <Scale className="size-4 text-amber-400" />
-        <h2 className="text-sm font-semibold text-slate-100">Original Docker image vs Node.js rewrite</h2>
+        <h2 className="text-sm font-semibold text-slate-100">原始 Docker 镜像 vs Node.js 重写版</h2>
       </div>
       <p className="mb-4 text-xs text-slate-500">
-        measured on the original Debian+socat image vs this Node supervisor
+        在原始 Debian+socat 镜像与此 Node 守护进程上测量
       </p>
 
       <div className="grid grid-cols-1 gap-3">
@@ -940,13 +940,13 @@ function ComparisonSection() {
             <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
               <div className="rounded-md border border-rose-500/20 bg-rose-500/5 p-2.5">
                 <div className="mb-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-rose-300/80">
-                  <Boxes className="size-3" /> Original
+                  <Boxes className="size-3" /> 原始版
                 </div>
                 <div className="font-mono text-xs leading-relaxed text-slate-400">{row.original}</div>
               </div>
               <div className="rounded-md border border-emerald-500/25 bg-emerald-500/5 p-2.5">
                 <div className="mb-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-emerald-300/90">
-                  <Check className="size-3" /> Node rewrite
+                  <Check className="size-3" /> Node.js 重写版
                 </div>
                 <div className="font-mono text-xs leading-relaxed text-slate-100">{row.node}</div>
               </div>
@@ -956,9 +956,8 @@ function ComparisonSection() {
       </div>
 
       <p className="mt-4 border-t border-white/5 pt-3 text-[11px] leading-relaxed text-slate-500">
-        The official <code className="text-slate-400">warp-svc</code> Rust daemon is still required to speak the
-        MASQUE protocol — this rewrite eliminates the wasteful socat double-hop and bash overhead,
-        and adds supervision + observability.
+        官方 <code className="text-slate-400">warp-svc</code> Rust 守护进程仍然需要用于 MASQUE 协议通信 —
+        此重写消除了浪费的 socat 双跳和 bash 开销，并增加了监管 + 可观测性。
       </p>
     </Card>
   )
@@ -981,7 +980,7 @@ function DashboardFooter({
     <footer className="mt-auto border-t border-white/5 bg-slate-950/80 backdrop-blur">
       <div className="mx-auto flex max-w-7xl flex-col items-center gap-3 px-4 py-4 text-xs text-slate-500 sm:flex-row sm:justify-between sm:px-6">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-slate-400">WARP Control Center · Node.js rewrite</span>
+          <span className="text-slate-400">WARP 控制中心 · Node.js 重写版</span>
           <span className="hidden text-slate-700 sm:inline">·</span>
           <a
             href="https://github.com/seiry/cloudflare-warp-proxy"
@@ -996,11 +995,11 @@ function DashboardFooter({
         <div className="flex items-center gap-3 font-mono text-[11px]">
           <span className="inline-flex items-center gap-1.5">
             <span className={cn('size-1.5 rounded-full', connected ? 'bg-emerald-400 animate-pulse' : 'bg-slate-600')} />
-            control :{controlPort}
+            控制面 :{controlPort}
           </span>
           <span className="inline-flex items-center gap-1.5">
             <span className={cn('size-1.5 rounded-full', proxyListening ? 'bg-emerald-400 animate-pulse' : 'bg-slate-600')} />
-            proxy :{proxyPort}
+            代理 :{proxyPort}
           </span>
         </div>
       </div>
@@ -1079,9 +1078,9 @@ export default function Home() {
         <div className="mx-auto w-full max-w-7xl px-4 pt-4 sm:px-6">
           <Alert variant="destructive" className="border-rose-500/30 bg-rose-500/10 text-rose-200">
             <CircleAlert className="size-4 text-rose-400" />
-            <AlertTitle className="text-rose-200">Cannot reach WARP control plane on :3030</AlertTitle>
+            <AlertTitle className="text-rose-200">无法连接到 WARP 控制面（:3030）</AlertTitle>
             <AlertDescription className="text-rose-300/80">
-              Is the mini-service running? — {error}
+              mini-service 是否在运行？ — {error}
             </AlertDescription>
           </Alert>
         </div>
