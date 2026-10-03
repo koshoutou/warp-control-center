@@ -12,6 +12,7 @@ import {
   Power, PowerOff, RefreshCw, Terminal, Trash2, Copy, Check,
   Loader2, Activity, CircleAlert, ChevronDown, Zap, KeyRound,
   Boxes, Scale, Gauge, Download, Search, SlidersHorizontal, ArrowUpDown,
+  Clock, Command,
 } from 'lucide-react'
 import {
   AreaChart, Area, Line, XAxis, YAxis, CartesianGrid,
@@ -285,7 +286,7 @@ function Header({ connected, demo, lastMetric }: { connected: boolean; demo: boo
               seiry/cloudflare-warp-proxy 的 Node.js 重写版
             </p>
             <p className="hidden text-[10px] text-slate-600 lg:block">
-              快捷键: C 连接 · D 断开 · R 重启 · T 链路
+              快捷键: ⌘K 命令 · C 连接 · D 断开 · R 重启
             </p>
           </div>
         </div>
@@ -561,7 +562,12 @@ function ChartsRow({ chartData, timeRange, setTimeRange }: {
                 <XAxis dataKey="time" stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} minTickGap={48} />
                 <YAxis yAxisId="rss" stroke="#f59e0b" fontSize={10} tickLine={false} axisLine={false} width={38} allowDecimals={false} />
                 <YAxis yAxisId="cpu" orientation="right" stroke="#fb923c" fontSize={10} tickLine={false} axisLine={false} width={32} unit="%" domain={[0, 100]} allowDecimals={false} ticks={[0, 25, 50, 75, 100]} />
-                <RTooltip contentStyle={tooltipStyle} labelStyle={{ color: '#94a3b8', fontSize: 11 }} itemStyle={{ color: '#e2e8f0' }} />
+                <RTooltip
+                  contentStyle={tooltipStyle}
+                  labelStyle={{ color: '#94a3b8', fontSize: 11 }}
+                  itemStyle={{ color: '#e2e8f0' }}
+                  cursor={{ stroke: '#f59e0b', strokeWidth: 1, strokeDasharray: '4 4', strokeOpacity: 0.5 }}
+                />
                 <Area yAxisId="rss" type="monotone" dataKey="rss" name="RSS (MB)" stroke="#f59e0b" strokeWidth={2} fill="url(#rssArea)" isAnimationActive animationDuration={300} animationEasing="ease-out" />
                 <Line yAxisId="cpu" type="monotone" dataKey="cpu" name="CPU (%)" stroke="#fb923c" strokeWidth={2} dot={false} isAnimationActive animationDuration={300} animationEasing="ease-out" />
               </AreaChart>
@@ -609,6 +615,7 @@ function ChartsRow({ chartData, timeRange, setTimeRange }: {
                   labelStyle={{ color: '#94a3b8', fontSize: 11 }}
                   itemStyle={{ color: '#e2e8f0' }}
                   formatter={(value: number | string, name: string) => [formatRate(Number(value)), name]}
+                  cursor={{ stroke: '#f59e0b', strokeWidth: 1, strokeDasharray: '4 4', strokeOpacity: 0.5 }}
                 />
                 <Area type="monotone" dataKey="rx" name="↓ 接收" stroke="#f59e0b" strokeWidth={2} fill="url(#rxArea)" isAnimationActive animationDuration={300} animationEasing="ease-out" />
                 <Area type="monotone" dataKey="tx" name="↑ 发送" stroke="#f43f5e" strokeWidth={2} fill="url(#txArea)" isAnimationActive animationDuration={300} animationEasing="ease-out" />
@@ -1485,6 +1492,110 @@ function QuickSetupSection() {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Section: Command palette (Cmd+K)                                   */
+/* ------------------------------------------------------------------ */
+
+interface CommandAction {
+  id: string
+  label: string
+  hint?: string
+  icon: React.ComponentType<{ className?: string }>
+  run: () => void
+}
+
+function CommandPalette({
+  open, onClose, actions,
+}: {
+  open: boolean
+  onClose: () => void
+  actions: CommandAction[]
+}) {
+  const [query, setQuery] = useState('')
+  const [active, setActive] = useState(0)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (!q) return actions
+    return actions.filter((a) => a.label.toLowerCase().includes(q) || a.hint?.toLowerCase().includes(q))
+  }, [query, actions])
+
+  // 打开时自动聚焦（不在此处 setState，用 autoFocus + key 重置避免 lint 冲突）
+  useEffect(() => {
+    if (open) {
+      const t = setTimeout(() => inputRef.current?.focus(), 50)
+      return () => clearTimeout(t)
+    }
+  }, [open])
+
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { e.preventDefault(); onClose() }
+      else if (e.key === 'ArrowDown') { e.preventDefault(); setActive((a) => Math.min(a + 1, filtered.length - 1)) }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); setActive((a) => Math.max(a - 1, 0)) }
+      else if (e.key === 'Enter' && filtered[active]) { e.preventDefault(); filtered[active].run(); onClose() }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [open, filtered, active, onClose])
+
+  if (!open) return null
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-start justify-center bg-slate-950/60 backdrop-blur-sm" onClick={onClose}>
+      <div
+        className="mt-[15vh] w-full max-w-lg overflow-hidden rounded-xl border border-white/10 bg-slate-900 shadow-2xl shadow-black/50"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center gap-2 border-b border-white/5 px-4 py-3">
+          <Search className="size-4 text-slate-500" />
+          <input
+            ref={inputRef}
+            type="text"
+            value={query}
+            onChange={(e) => { setQuery(e.target.value); setActive(0) }}
+            placeholder="输入命令或搜索…"
+            className="flex-1 bg-transparent text-sm text-slate-100 placeholder:text-slate-600 focus:outline-none"
+          />
+          <kbd className="rounded border border-white/10 bg-white/5 px-1.5 py-0.5 font-mono text-[10px] text-slate-500">ESC</kbd>
+        </div>
+        <div className="max-h-80 overflow-y-auto p-2 [scrollbar-width:thin] [scrollbar-color:#334155_transparent]">
+          {filtered.length === 0 ? (
+            <div className="py-8 text-center text-xs text-slate-600">无匹配命令</div>
+          ) : (
+            filtered.map((a, i) => {
+              const Icon = a.icon
+              return (
+                <button
+                  key={a.id}
+                  onMouseEnter={() => setActive(i)}
+                  onClick={() => { a.run(); onClose() }}
+                  className={cn(
+                    'flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm transition-colors',
+                    i === active ? 'bg-amber-500/10 text-amber-200' : 'text-slate-300 hover:bg-white/5'
+                  )}
+                >
+                  <Icon className={cn('size-4', i === active ? 'text-amber-400' : 'text-slate-500')} />
+                  <span className="flex-1">{a.label}</span>
+                  {a.hint && <span className="font-mono text-[10px] text-slate-600">{a.hint}</span>}
+                </button>
+              )
+            })
+          )}
+        </div>
+        <div className="flex items-center justify-between border-t border-white/5 px-4 py-2 text-[10px] text-slate-600">
+          <span className="flex items-center gap-2">
+            <kbd className="rounded border border-white/10 bg-white/5 px-1 py-0.5 font-mono">↑↓</kbd> 导航
+            <kbd className="rounded border border-white/10 bg-white/5 px-1 py-0.5 font-mono">↵</kbd> 执行
+          </span>
+          <span>{filtered.length} 个命令</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
 /*  Section: Comparison                                                 */
 /* ------------------------------------------------------------------ */
 
@@ -1535,14 +1646,23 @@ function ComparisonSection() {
 /*  Section: Footer                                                     */
 /* ------------------------------------------------------------------ */
 
+function formatUptime(seconds: number): string {
+  if (seconds < 60) return `${Math.floor(seconds)}秒`
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}分${Math.floor(seconds % 60)}秒`
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}时${Math.floor((seconds % 3600) / 60)}分`
+  return `${Math.floor(seconds / 86400)}天${Math.floor((seconds % 86400) / 3600)}时`
+}
+
 function DashboardFooter({
-  proxyUrl, connected, controlPort, proxyPort, proxyListening,
+  proxyUrl, connected, controlPort, proxyPort, proxyListening, uptime, onScrollTop,
 }: {
   proxyUrl: string
   connected: boolean
   controlPort: number
   proxyPort: number
   proxyListening: boolean
+  uptime: number
+  onScrollTop: () => void
 }) {
   return (
     <footer className="mt-auto border-t border-white/5 bg-slate-950/80 backdrop-blur">
@@ -1562,6 +1682,11 @@ function DashboardFooter({
         <div className="font-mono text-slate-400">{proxyUrl}</div>
         <div className="flex items-center gap-3 font-mono text-[11px]">
           <span className="inline-flex items-center gap-1.5">
+            <Clock className="size-3 text-amber-400/70" />
+            <span className="text-slate-400">运行 {formatUptime(uptime)}</span>
+          </span>
+          <span className="hidden h-3 w-px bg-white/10 sm:inline-block" />
+          <span className="inline-flex items-center gap-1.5">
             <span className={cn('size-1.5 rounded-full', connected ? 'bg-emerald-400 animate-pulse' : 'bg-slate-600')} />
             控制面 :{controlPort}
           </span>
@@ -1569,6 +1694,14 @@ function DashboardFooter({
             <span className={cn('size-1.5 rounded-full', proxyListening ? 'bg-emerald-400 animate-pulse' : 'bg-slate-600')} />
             代理 :{proxyPort}
           </span>
+          <button
+            onClick={onScrollTop}
+            className="ml-1 inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/5 px-2 py-1 text-slate-400 transition-colors hover:bg-white/10 hover:text-slate-200"
+            title="回到顶部"
+          >
+            <ArrowUp className="size-3" />
+            <span className="hidden sm:inline">顶部</span>
+          </button>
         </div>
       </div>
     </footer>
@@ -1622,6 +1755,8 @@ export default function Home() {
   } = warp
 
   const [timeRange, setTimeRange] = useState(300) // 秒数：60/300/900/1800
+  const [uptime, setUptime] = useState(0)
+  const [cmdOpen, setCmdOpen] = useState(false)
   const [runtimeSettings, setRuntimeSettings] = useState<RuntimeSettingsData | null>(null)
 
   const chartData = useMemo(
@@ -1641,11 +1776,17 @@ export default function Home() {
     [chartData],
   )
 
-  // 快捷键：C=连接 D=断开 R=重启 T=测试链路
+  // 快捷键：C=连接 D=断开 R=重启 T=测试链路, ⌘K/Ctrl+K=命令面板
   useEffect(() => {
-    if (loading) return
     const onKey = (e: KeyboardEvent) => {
-      // 忽略输入框中的按键
+      // Cmd+K / Ctrl+K 打开命令面板（在任何地方都生效）
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        setCmdOpen((v) => !v)
+        return
+      }
+      if (loading) return
+      // 忽略输入框中的普通按键
       const tag = (e.target as HTMLElement)?.tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable) return
       const k = e.key.toLowerCase()
@@ -1657,6 +1798,13 @@ export default function Home() {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [loading, connect, disconnect, restart])
+
+  // 运行时长计时
+  const startTimeRef = useRef(Date.now())
+  useEffect(() => {
+    const id = setInterval(() => setUptime((Date.now() - startTimeRef.current) / 1000), 1000)
+    return () => clearInterval(id)
+  }, [])
 
   // 加载运行时配置
   useEffect(() => {
@@ -1768,6 +1916,21 @@ export default function Home() {
         controlPort={config?.controlPort ?? 3030}
         proxyPort={config?.proxyPort ?? 40000}
         proxyListening={proxy?.listening ?? false}
+        uptime={uptime}
+        onScrollTop={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+      />
+
+      <CommandPalette
+        key={cmdOpen ? 'open' : 'closed'}
+        open={cmdOpen}
+        onClose={() => setCmdOpen(false)}
+        actions={[
+          { id: 'connect', label: '连接 WARP', hint: 'C', icon: Power, run: () => connect().catch(() => {}) },
+          { id: 'disconnect', label: '断开 WARP', hint: 'D', icon: PowerOff, run: () => disconnect().catch(() => {}) },
+          { id: 'restart', label: '重启 WARP', hint: 'R', icon: RefreshCw, run: () => restart().catch(() => {}) },
+          { id: 'top', label: '回到顶部', icon: ArrowUp, run: () => window.scrollTo({ top: 0, behavior: 'smooth' }) },
+          { id: 'bottom', label: '跳到底部', icon: ArrowDown, run: () => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }) },
+        ]}
       />
 
       <SonnerToaster theme="dark" position="bottom-right" richColors closeButton />
