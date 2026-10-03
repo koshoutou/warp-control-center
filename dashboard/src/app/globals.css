@@ -120,3 +120,22 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* KPI 数值变化动画 */
+@keyframes kpi-flash {
+  0% { color: #fbbf24; transform: scale(1.05); }
+  100% { color: var(--foreground); transform: scale(1); }
+}
+.kpi-flash {
+  animation: kpi-flash 0.6s ease-out;
+}
+
+/* 数据流指示器脉动（每次 lastMetric 变化通过 key 重新挂载触发） */
+@keyframes data-pulse {
+  0% { transform: scale(1); opacity: 1; box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.6); }
+  70% { transform: scale(1.6); opacity: 0.6; box-shadow: 0 0 0 6px rgba(56, 189, 248, 0); }
+  100% { transform: scale(1); opacity: 1; box-shadow: 0 0 0 0 rgba(56, 189, 248, 0); }
+}
+.data-pulse {
+  animation: data-pulse 0.8s ease-out;
+}

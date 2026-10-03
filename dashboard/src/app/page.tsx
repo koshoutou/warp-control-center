@@ -11,7 +11,7 @@ import {
   Shield, Globe, Network, MemoryStick, ArrowDownUp, ArrowDown, ArrowUp,
   Power, PowerOff, RefreshCw, Terminal, Trash2, Copy, Check,
   Loader2, Activity, CircleAlert, ChevronDown, Zap, KeyRound,
-  Boxes, Scale, Gauge, Download,
+  Boxes, Scale, Gauge, Download, Search,
 } from 'lucide-react'
 import {
   AreaChart, Area, Line, XAxis, YAxis, CartesianGrid,
@@ -252,7 +252,7 @@ function Sparkline({ data, dataKey, color }: { data: { [k: string]: number | str
 /*  Section: Header                                                    */
 /* ------------------------------------------------------------------ */
 
-function Header({ connected, demo }: { connected: boolean; demo: boolean }) {
+function Header({ connected, demo, lastMetric }: { connected: boolean; demo: boolean; lastMetric: number | null }) {
   const [now, setNow] = useState(() => new Date())
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 1000)
@@ -283,6 +283,17 @@ function Header({ connected, demo }: { connected: boolean; demo: boolean }) {
           <span className="hidden font-mono text-xs tabular-nums text-slate-400 sm:inline">
             {fmtClock(now)}
           </span>
+          <span
+            className="inline-flex items-center gap-1.5 rounded-full border border-sky-400/30 bg-sky-400/10 px-2 py-1 text-[10px] font-medium text-sky-300"
+            title="每秒接收指标数据"
+          >
+            <Activity className="size-3" />
+            <span className="hidden sm:inline">数据流</span>
+            <span
+              key={lastMetric ?? 0}
+              className="size-1.5 rounded-full bg-sky-400 data-pulse"
+            />
+          </span>
           <WsPill connected={connected} />
           <ModeBadge demo={demo} />
         </div>
@@ -307,6 +318,17 @@ interface KpiCardProps {
 }
 
 function KpiCard({ title, icon: Icon, iconClass, value, sub, pulse, glow, children }: KpiCardProps) {
+  const valueRef = useRef<HTMLSpanElement>(null)
+  const prevValue = useRef<React.ReactNode>(value)
+  useEffect(() => {
+    if (prevValue.current !== value && valueRef.current) {
+      valueRef.current.classList.remove('kpi-flash')
+      // force reflow to restart animation
+      void valueRef.current.offsetWidth
+      valueRef.current.classList.add('kpi-flash')
+      prevValue.current = value
+    }
+  }, [value])
   return (
     <Card
       className={cn(
@@ -318,7 +340,7 @@ function KpiCard({ title, icon: Icon, iconClass, value, sub, pulse, glow, childr
         <div className="min-w-0">
           <p className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{title}</p>
           <div className="mt-2 flex items-end gap-2">
-            <span className="truncate font-mono text-3xl font-semibold leading-none text-slate-50 tabular-nums">
+            <span ref={valueRef} className="truncate font-mono text-3xl font-semibold leading-none text-slate-50 tabular-nums">
               {value}
             </span>
             {pulse && <LiveDot on={pulse} className="mb-1" />}
@@ -1045,7 +1067,27 @@ function LogStream({ logs, onClear }: { logs: LogLine[]; onClear: () => void }) 
   const scrollRef = useRef<HTMLDivElement>(null)
   const stickRef = useRef(true)
   const [levelFilter, setLevelFilter] = useState<LogLevel | 'all'>('all')
-  const filteredLogs = logs.filter((l) => levelFilter === 'all' || l.level === levelFilter)
+  const [search, setSearch] = useState('')
+  const q = search.trim().toLowerCase()
+  const filteredLogs = logs.filter((l) => {
+    if (levelFilter !== 'all' && l.level !== levelFilter) return false
+    if (q && !(`${l.cat} ${l.msg}`.toLowerCase().includes(q))) return false
+    return true
+  })
+
+  // 高亮匹配的关键字
+  const highlight = (text: string) => {
+    if (!q) return text
+    const idx = text.toLowerCase().indexOf(q)
+    if (idx < 0) return text
+    return (
+      <>
+        {text.slice(0, idx)}
+        <mark className="rounded-sm bg-amber-400/30 px-0.5 text-amber-200">{text.slice(idx, idx + q.length)}</mark>
+        {text.slice(idx + q.length)}
+      </>
+    )
+  }
 
   // Keep pinned to bottom when new logs arrive (unless user scrolled up).
   useEffect(() => {
@@ -1070,7 +1112,17 @@ function LogStream({ logs, onClear }: { logs: LogLine[]; onClear: () => void }) 
           <h2 className="text-sm font-semibold text-slate-100">日志流</h2>
           <span className="text-xs text-slate-500">{filteredLogs.length} / {logs.length} 行</span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-2 top-1/2 size-3 -translate-y-1/2 text-slate-500" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="搜索日志…"
+              className="h-7 w-32 rounded-md border border-white/10 bg-slate-950/60 pl-7 pr-2 font-mono text-[11px] text-slate-200 placeholder:text-slate-600 focus:border-amber-500/40 focus:outline-none focus:ring-1 focus:ring-amber-500/30 sm:w-40"
+            />
+          </div>
           <div className="flex items-center gap-1">
             {(['all', 'info', 'warn', 'error', 'debug'] as const).map((lv) => (
               <button
@@ -1116,7 +1168,7 @@ function LogStream({ logs, onClear }: { logs: LogLine[]; onClear: () => void }) 
                   {l.level}
                 </span>
                 <span className="hidden shrink-0 text-slate-500 sm:inline">[{l.cat}]</span>
-                <span className="break-all text-slate-300">{l.msg}</span>
+                <span className="break-all text-slate-300">{highlight(l.msg)}</span>
               </div>
             )
           })
@@ -1400,7 +1452,7 @@ export default function Home() {
 
   return (
     <div className="dark flex min-h-screen flex-col bg-slate-950 text-slate-100">
-      <Header connected={connected} demo={warpStatus?.demo ?? false} />
+      <Header connected={connected} demo={warpStatus?.demo ?? false} lastMetric={proc?.t ?? null} />
 
       {error && (
         <div className="mx-auto w-full max-w-7xl px-4 pt-4 sm:px-6">
