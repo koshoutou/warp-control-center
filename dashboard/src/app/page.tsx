@@ -313,7 +313,7 @@ function KpiCard({ title, icon: Icon, iconClass, value, sub, pulse, glow, childr
 function KpiRow({
   warpState, warpDemo, warpVersion, warpRunning, warpPid, warpLastError,
   connsActive, connsTotal, connsRejected,
-  rssMB, heapUsed, heapTotal,
+  rssMB, heapUsed, heapTotal, cpuPct,
   rxRate, txRate, rxTotal, txTotal,
   history,
 }: {
@@ -329,6 +329,7 @@ function KpiRow({
   rssMB: number
   heapUsed: number
   heapTotal: number
+  cpuPct: number
   rxRate: number
   txRate: number
   rxTotal: number
@@ -374,9 +375,33 @@ function KpiRow({
         icon={MemoryStick}
         iconClass="bg-orange-500/10 text-orange-400 ring-1 ring-orange-500/20"
         value={`${rssMB.toFixed(1)} MB`}
-        sub={`堆 ${heapUsed.toFixed(1)} / ${heapTotal.toFixed(1)} MB`}
+        sub={
+          <span className="flex gap-3">
+            <span>堆 {heapUsed.toFixed(1)} / {heapTotal.toFixed(1)} MB</span>
+            <span className={cn(cpuPct > 80 ? 'text-rose-400' : cpuPct > 50 ? 'text-amber-400' : 'text-slate-400')}>
+              CPU {cpuPct.toFixed(1)}%
+            </span>
+          </span>
+        }
       >
         {history.length > 1 && <Sparkline data={history} dataKey="rss" color="#f59e0b" />}
+        {cpuPct > 0 && (
+          <div className="mt-2">
+            <div className="mb-1 flex items-center justify-between text-[10px] text-slate-500">
+              <span>CPU</span>
+              <span className={cn(cpuPct > 80 ? 'text-rose-400' : cpuPct > 50 ? 'text-amber-400' : 'text-emerald-400')}>{cpuPct.toFixed(1)}%</span>
+            </div>
+            <div className="h-1.5 overflow-hidden rounded-full bg-slate-800">
+              <div
+                className={cn(
+                  'h-full rounded-full transition-all duration-500',
+                  cpuPct > 80 ? 'bg-rose-500' : cpuPct > 50 ? 'bg-amber-500' : 'bg-emerald-500'
+                )}
+                style={{ width: `${Math.min(100, cpuPct)}%` }}
+              />
+            </div>
+          </div>
+        )}
       </KpiCard>
       <KpiCard
         title="吞吐量"
@@ -450,8 +475,8 @@ function ChartsRow({ chartData }: { chartData: { time: string; rss: number; cpu:
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
                 <XAxis dataKey="time" stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} minTickGap={48} />
-                <YAxis yAxisId="rss" stroke="#f59e0b" fontSize={10} tickLine={false} axisLine={false} width={38} />
-                <YAxis yAxisId="cpu" orientation="right" stroke="#fb923c" fontSize={10} tickLine={false} axisLine={false} width={32} unit="%" />
+                <YAxis yAxisId="rss" stroke="#f59e0b" fontSize={10} tickLine={false} axisLine={false} width={38} allowDecimals={false} />
+                <YAxis yAxisId="cpu" orientation="right" stroke="#fb923c" fontSize={10} tickLine={false} axisLine={false} width={32} unit="%" domain={[0, 100]} allowDecimals={false} ticks={[0, 25, 50, 75, 100]} />
                 <RTooltip contentStyle={tooltipStyle} labelStyle={{ color: '#94a3b8', fontSize: 11 }} itemStyle={{ color: '#e2e8f0' }} />
                 <Area yAxisId="rss" type="monotone" dataKey="rss" name="RSS (MB)" stroke="#f59e0b" strokeWidth={2} fill="url(#rssArea)" isAnimationActive={false} />
                 <Line yAxisId="cpu" type="monotone" dataKey="cpu" name="CPU (%)" stroke="#fb923c" strokeWidth={2} dot={false} isAnimationActive={false} />
@@ -494,7 +519,7 @@ function ChartsRow({ chartData }: { chartData: { time: string; rss: number; cpu:
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
                 <XAxis dataKey="time" stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} minTickGap={48} />
-                <YAxis stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} width={56} tickFormatter={(v: number) => formatRate(Number(v))} />
+                <YAxis stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} width={56} allowDecimals={false} tickFormatter={(v: number) => formatRate(Number(v))} />
                 <RTooltip
                   contentStyle={tooltipStyle}
                   labelStyle={{ color: '#94a3b8', fontSize: 11 }}
@@ -817,8 +842,12 @@ function ConnectionsTable({ conns }: { conns: ConnEvent[] }) {
           <TableBody>
             {rows.length === 0 ? (
               <TableRow className="border-transparent hover:bg-transparent">
-                <TableCell colSpan={7} className="h-28 text-center text-xs text-slate-500">
-                  暂无连接 — 请将客户端指向代理地址。
+                <TableCell colSpan={7} className="h-32 text-center">
+                  <div className="flex flex-col items-center gap-2 text-slate-500">
+                    <Network className="size-8 text-slate-700" />
+                    <span className="text-xs">暂无连接 — 请将客户端指向代理地址</span>
+                    <code className="rounded bg-slate-800/50 px-2 py-0.5 font-mono text-[10px] text-amber-400/80">socks5h://127.0.0.1:40000</code>
+                  </div>
                 </TableCell>
               </TableRow>
             ) : (
@@ -854,6 +883,8 @@ function ConnectionsTable({ conns }: { conns: ConnEvent[] }) {
 function LogStream({ logs, onClear }: { logs: LogLine[]; onClear: () => void }) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const stickRef = useRef(true)
+  const [levelFilter, setLevelFilter] = useState<LogLevel | 'all'>('all')
+  const filteredLogs = logs.filter((l) => levelFilter === 'all' || l.level === levelFilter)
 
   // Keep pinned to bottom when new logs arrive (unless user scrolled up).
   useEffect(() => {
@@ -861,7 +892,7 @@ function LogStream({ logs, onClear }: { logs: LogLine[]; onClear: () => void }) 
     if (el && stickRef.current) {
       el.scrollTop = el.scrollHeight
     }
-  }, [logs.length])
+  }, [filteredLogs.length])
 
   const onScroll = useCallback(() => {
     const el = scrollRef.current
@@ -876,28 +907,46 @@ function LogStream({ logs, onClear }: { logs: LogLine[]; onClear: () => void }) 
         <div className="flex items-center gap-2">
           <Terminal className="size-4 text-amber-400" />
           <h2 className="text-sm font-semibold text-slate-100">日志流</h2>
-          <span className="text-xs text-slate-500">{logs.length} 行</span>
+          <span className="text-xs text-slate-500">{filteredLogs.length} / {logs.length} 行</span>
         </div>
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={onClear}
-          className="h-7 text-xs text-slate-400 hover:bg-white/5 hover:text-slate-200"
-        >
-          <Trash2 className="size-3.5" /> 清空
-        </Button>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
+            {(['all', 'info', 'warn', 'error', 'debug'] as const).map((lv) => (
+              <button
+                key={lv}
+                onClick={() => setLevelFilter(lv)}
+                className={cn(
+                  'rounded px-2 py-0.5 text-[10px] font-medium uppercase transition-colors',
+                  levelFilter === lv
+                    ? 'bg-amber-500/15 text-amber-300 ring-1 ring-amber-500/30'
+                    : 'text-slate-500 hover:bg-white/5 hover:text-slate-300'
+                )}
+              >
+                {lv === 'all' ? '全部' : lv}
+              </button>
+            ))}
+          </div>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={onClear}
+            className="h-7 text-xs text-slate-400 hover:bg-white/5 hover:text-slate-200"
+          >
+            <Trash2 className="size-3.5" /> 清空
+          </Button>
+        </div>
       </div>
       <div
         ref={scrollRef}
         onScroll={onScroll}
         className="max-h-96 overflow-y-auto rounded-md border border-white/5 bg-slate-950/80 p-3 font-mono text-xs leading-relaxed [scrollbar-width:thin] [scrollbar-color:#334155_transparent]"
       >
-        {logs.length === 0 ? (
+        {filteredLogs.length === 0 ? (
           <div className="grid h-24 place-items-center text-xs text-slate-600">
             暂无日志。
           </div>
         ) : (
-          logs.map((l, i) => {
+          filteredLogs.map((l, i) => {
             const m = logLevelMeta(l.level)
             return (
               <div key={i} className="flex items-start gap-2 py-0.5">
@@ -911,6 +960,105 @@ function LogStream({ logs, onClear }: { logs: LogLine[]; onClear: () => void }) 
             )
           })
         )}
+      </div>
+    </Card>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/*  Section: Quick setup snippets                                      */
+/* ------------------------------------------------------------------ */
+
+const SETUP_SNIPPETS: { id: string; label: string; icon: typeof Terminal; code: string }[] = [
+  {
+    id: 'curl',
+    label: 'curl',
+    icon: Terminal,
+    code: `# 通过 WARP 代理访问（远程 DNS 解析）
+curl https://www.cloudflare.com/cdn-cgi/trace -x socks5h://127.0.0.1:40000
+
+# 或使用 HTTP CONNECT
+curl https://www.cloudflare.com/cdn-cgi/trace -x http://127.0.0.1:40000`,
+  },
+  {
+    id: 'git',
+    label: 'git',
+    icon: Terminal,
+    code: `# 临时使用 WARP 代理克隆仓库
+git -c http.proxy=socks5h://127.0.0.1:40000 clone https://github.com/user/repo.git
+
+# 或全局设置
+git config --global http.proxy socks5h://127.0.0.1:40000
+git config --global --unset http.proxy  # 取消`,
+  },
+  {
+    id: 'firefox',
+    label: 'Firefox',
+    icon: Globe,
+    code: `# Firefox → 首选项 → 网络设置 → 手动配置代理
+# SOCKS 主机: 127.0.0.1  端口: 40000
+# SOCKS v5  ✓ 远程 DNS（重要：勾选此项）
+# 然后访问 https://www.cloudflare.com/cdn-cgi/trace 验证 warp=on`,
+  },
+  {
+    id: 'env',
+    label: '环境变量',
+    icon: Terminal,
+    code: `# 设置 shell 全局代理（影响 curl/wget/git 等）
+export ALL_PROXY=socks5h://127.0.0.1:40000
+export HTTP_PROXY=http://127.0.0.1:40000
+export HTTPS_PROXY=http://127.0.0.1:40000
+
+# 取消
+unset ALL_PROXY HTTP_PROXY HTTPS_PROXY`,
+  },
+]
+
+function QuickSetupSection() {
+  const [active, setActive] = useState(SETUP_SNIPPETS[0].id)
+  const snippet = SETUP_SNIPPETS.find((s) => s.id === active) ?? SETUP_SNIPPETS[0]
+  const ActiveIcon = snippet.icon
+  return (
+    <Card className="rounded-xl border-white/5 bg-slate-900/60 p-5 shadow-lg shadow-black/20">
+      <div className="mb-4 flex items-center gap-2">
+        <Terminal className="size-4 text-amber-400" />
+        <h2 className="text-sm font-semibold text-slate-100">快速配置</h2>
+        <span className="text-xs text-slate-500">常用客户端代理配置示例</span>
+      </div>
+      <div className="mb-3 flex flex-wrap gap-1.5">
+        {SETUP_SNIPPETS.map((s) => {
+          const Icon = s.icon
+          return (
+            <button
+              key={s.id}
+              onClick={() => setActive(s.id)}
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
+                active === s.id
+                  ? 'bg-amber-500/15 text-amber-300 ring-1 ring-amber-500/30'
+                  : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'
+              )}
+            >
+              <Icon className="size-3.5" /> {s.label}
+            </button>
+          )
+        })}
+      </div>
+      <div className="relative">
+        <pre className="max-h-64 overflow-auto rounded-md border border-white/5 bg-slate-950/80 p-3 pr-10 font-mono text-xs leading-relaxed text-slate-300 [scrollbar-width:thin] [scrollbar-color:#334155_transparent]">
+          {snippet.code}
+        </pre>
+        <button
+          onClick={() => copyToClipboard(snippet.code, `${snippet.label} 配置已复制`)}
+          className="absolute right-2 top-2 rounded-md border border-white/10 bg-slate-800/80 p-1.5 text-slate-400 transition-colors hover:bg-slate-700 hover:text-slate-200"
+          aria-label="复制配置"
+        >
+          <Copy className="size-3.5" />
+        </button>
+      </div>
+      <div className="mt-3 flex items-center gap-1.5 text-[11px] text-slate-500">
+        <ActiveIcon className="size-3 text-amber-400/60" />
+        <span>将代理指向 <code className="rounded bg-slate-800/50 px-1 font-mono text-amber-400/80">127.0.0.1:40000</code> 即可使用</span>
       </div>
     </Card>
   )
@@ -934,21 +1082,21 @@ function ComparisonSection() {
       <div className="grid grid-cols-1 gap-3">
         {COMPARISON_ROWS.map((row) => (
           <div key={row.label} className="rounded-lg border border-white/5 bg-slate-950/40 p-3.5">
-            <div className="mb-2.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+            <div className="mb-2.5 text-xs font-medium uppercase tracking-wider text-slate-400">
               {row.label}
             </div>
             <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
               <div className="rounded-md border border-rose-500/20 bg-rose-500/5 p-2.5">
-                <div className="mb-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-rose-300/80">
+                <div className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-rose-300/80">
                   <Boxes className="size-3" /> 原始版
                 </div>
-                <div className="font-mono text-xs leading-relaxed text-slate-400">{row.original}</div>
+                <div className="font-mono text-[13px] leading-relaxed text-slate-400">{row.original}</div>
               </div>
               <div className="rounded-md border border-emerald-500/25 bg-emerald-500/5 p-2.5">
-                <div className="mb-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-emerald-300/90">
+                <div className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-emerald-300/90">
                   <Check className="size-3" /> Node.js 重写版
                 </div>
-                <div className="font-mono text-xs leading-relaxed text-slate-100">{row.node}</div>
+                <div className="font-mono text-[13px] leading-relaxed text-slate-100">{row.node}</div>
               </div>
             </div>
           </div>
@@ -1104,6 +1252,7 @@ export default function Home() {
               rssMB={proc?.rssMB ?? 0}
               heapUsed={proc?.heapUsedMB ?? 0}
               heapTotal={proc?.heapTotalMB ?? 0}
+              cpuPct={proc?.cpuPct ?? 0}
               rxRate={proc?.rxBytesPerSec ?? 0}
               txRate={proc?.txBytesPerSec ?? 0}
               rxTotal={proxy?.totalRx ?? 0}
@@ -1124,6 +1273,8 @@ export default function Home() {
               />
               <ConfigPanel config={config} proxyUrl={proxyUrl} warp={warpStatus} />
             </div>
+
+            <QuickSetupSection />
 
             <ConnectionsTable conns={conns} />
 

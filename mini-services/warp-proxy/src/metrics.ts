@@ -16,11 +16,15 @@ export interface MetricSample {
   warpDemo: boolean
 }
 
-interface CpuTimes { utime: number; stime: number }
+interface CpuTimes { utime: number; stime: number } // 单位：秒
 
 /**
  * Low-overhead metrics: reads /proc/self/stat + process.memoryUsage() on a ticker.
- * No external deps. CPU% = (Δcpu_ticks / Δwall) * 100 (single-core-normalized).
+ * No external deps. CPU% = Δcpu_seconds / Δwall_seconds * 100 (single-core normalized).
+ *
+ * 修复历史 bug：原公式 `Δticks / Δseconds * 100` 缺少除以 CLK_TCK(=100)，
+ * 导致 1 tick/秒被算成 100% CPU（实际仅 1%），面板恒显示 100%。
+ * 现在统一返回秒，消除单位歧义。
  */
 export class MetricsCollector extends EventEmitter {
   private history: MetricSample[] = []
@@ -52,6 +56,7 @@ export class MetricsCollector extends EventEmitter {
     let cpuPct = 0
     if (this.lastCpu && dt > 0) {
       const d = (cpu.utime - this.lastCpu.utime) + (cpu.stime - this.lastCpu.stime)
+      // 正确公式：增量 CPU 秒 / 间隔墙钟秒 * 100（单核归一化）
       cpuPct = (d / dt) * 100
     }
     const snap = this.sampler()
@@ -84,13 +89,15 @@ export class MetricsCollector extends EventEmitter {
   private readCpu(): CpuTimes {
     try {
       const stat = readFileSync(`/proc/self/stat`, 'utf8').trim().split(' ')
-      // fields: utime=14, stime=15 (in clock ticks)
-      const utime = Number(stat[13])
-      const stime = Number(stat[14])
-      return { utime, stime }
+      // fields: utime=14 (index 13), stime=15 (index 14) — unit: clock ticks
+      const CLK_TCK = 100 // Linux 标准时钟频率
+      const utimeSec = Number(stat[13]) / CLK_TCK
+      const stimeSec = Number(stat[14]) / CLK_TCK
+      return { utime: utimeSec, stime: stimeSec }
     } catch {
+      // fallback: process.cpuUsage() 返回微秒，转换为秒
       const cpu = process.cpuUsage()
-      return { utime: cpu.user / 10000, stime: cpu.system / 10000 } // approximate to ticks
+      return { utime: cpu.user / 1e6, stime: cpu.system / 1e6 }
     }
   }
 }
