@@ -465,20 +465,39 @@ const tooltipStyle = {
   boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
 } as const
 
-function ChartsRow({ chartData }: { chartData: { time: string; rss: number; cpu: number; rx: number; tx: number }[] }) {
+function ChartsRow({ chartData, timeRange, setTimeRange }: {
+  chartData: { time: string; rss: number; cpu: number; rx: number; tx: number }[]
+  timeRange: number
+  setTimeRange: (n: number) => void
+}) {
   const empty = chartData.length === 0
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
       <Card className="rounded-xl border-white/5 bg-slate-900/60 p-5 shadow-lg shadow-black/20 lg:col-span-2">
-        <div className="mb-4 flex items-center justify-between">
+        <div className="mb-4 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <Activity className="size-4 text-amber-400" />
             <h2 className="text-sm font-semibold text-slate-100">资源使用</h2>
-            <span className="text-xs text-slate-500">近 5 分钟</span>
           </div>
-          <div className="flex items-center gap-3 text-[11px] text-slate-400">
-            <span className="hidden items-center gap-1.5 sm:inline-flex"><span className="size-2 rounded-sm bg-amber-500" /> RSS (MB)</span>
-            <span className="hidden items-center gap-1.5 sm:inline-flex"><span className="size-2 rounded-sm bg-orange-400" /> CPU (%)</span>
+          <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
+            <div className="flex items-center gap-0.5 rounded-md border border-white/10 bg-white/5 p-0.5">
+              {([60, 300, 900, 1800] as const).map((r) => (
+                <button
+                  key={r}
+                  onClick={() => setTimeRange(r)}
+                  className={cn(
+                    'rounded px-2 py-0.5 text-[11px] font-medium transition-colors',
+                    timeRange === r
+                      ? 'bg-amber-500/20 text-amber-300'
+                      : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'
+                  )}
+                >
+                  {r < 60 ? `${r}s` : r < 3600 ? `${r / 60}m` : `${r / 3600}h`}
+                </button>
+              ))}
+            </div>
+            <span className="hidden items-center gap-1.5 sm:inline-flex"><span className="size-2 rounded-sm bg-amber-500" /> RSS</span>
+            <span className="hidden items-center gap-1.5 sm:inline-flex"><span className="size-2 rounded-sm bg-orange-400" /> CPU</span>
             <button
               onClick={() => downloadCSV(`warp-metrics-${Date.now()}.csv`, chartData)}
               disabled={chartData.length === 0}
@@ -887,18 +906,23 @@ function ConnectionsTable({ conns }: { conns: ConnEvent[] }) {
             ) : (
               rows.map((c, i) => {
                 const m = connTypeMeta(c.type)
-                const target = c.host ? `${c.host}${c.port ? ':' + c.port : ''}` : '—'
+                const target = c.host ? `${c.host}${c.port ? ':' + c.port : ''}` : ''
                 return (
-                  <TableRow key={`${c.id}-${i}`} className="border-white/5">
+                  <TableRow key={`${c.id}-${i}`} className="border-white/5 transition-colors hover:bg-white/[0.03]">
                     <TableCell className="pl-3 font-mono text-xs text-slate-400">#{c.id}</TableCell>
                     <TableCell>
-                      <span className={cn('inline-flex rounded border px-1.5 py-0.5 text-[10px] font-medium', m.cls)}>{m.label}</span>
+                      <span className={cn('inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] font-medium', m.cls)}>
+                        {c.type === 'open' && <span className="size-1.5 rounded-full bg-emerald-400" />}
+                        {c.type === 'close' && <span className="size-1.5 rounded-full bg-slate-400" />}
+                        {c.type === 'error' && <span className="size-1.5 rounded-full bg-rose-400" />}
+                        {m.label}
+                      </span>
                     </TableCell>
-                    <TableCell className="font-mono text-xs text-slate-300">{target}</TableCell>
-                    <TableCell className="text-right font-mono text-xs text-emerald-300/80">{c.rx ? formatBytes(c.rx) : '—'}</TableCell>
-                    <TableCell className="text-right font-mono text-xs text-rose-300/80">{c.tx ? formatBytes(c.tx) : '—'}</TableCell>
-                    <TableCell className="text-right font-mono text-xs text-slate-400">{formatDuration(c.durationMs)}</TableCell>
-                    <TableCell className="pr-3 font-mono text-xs text-slate-500">{c.reason ?? '—'}</TableCell>
+                    <TableCell className={cn('font-mono text-xs', target ? 'text-slate-300' : 'text-slate-700')}>{target || '—'}</TableCell>
+                    <TableCell className={cn('text-right font-mono text-xs', c.rx ? 'text-emerald-300/80' : 'text-slate-700')}>{c.rx ? formatBytes(c.rx) : '—'}</TableCell>
+                    <TableCell className={cn('text-right font-mono text-xs', c.tx ? 'text-rose-300/80' : 'text-slate-700')}>{c.tx ? formatBytes(c.tx) : '—'}</TableCell>
+                    <TableCell className={cn('text-right font-mono text-xs', c.durationMs ? 'text-slate-400' : 'text-slate-700')}>{formatDuration(c.durationMs)}</TableCell>
+                    <TableCell className="pr-3 font-mono text-xs text-slate-500">{c.reason ?? ''}</TableCell>
                   </TableRow>
                 )
               })
@@ -939,6 +963,76 @@ function ConnectionsTable({ conns }: { conns: ConnEvent[] }) {
           )}
         </div>
       </div>
+    </Card>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/*  Section: Target statistics                                          */
+/* ------------------------------------------------------------------ */
+
+function TargetStats({ conns }: { conns: ConnEvent[] }) {
+  const stats = useMemo(() => {
+    const map = new Map<string, { count: number; rx: number; tx: number; lastSeen: number }>()
+    for (const c of conns) {
+      if (!c.host) continue
+      const key = `${c.host}${c.port ? ':' + c.port : ''}`
+      const cur = map.get(key) ?? { count: 0, rx: 0, tx: 0, lastSeen: 0 }
+      cur.count++
+      cur.rx += c.rx ?? 0
+      cur.tx += c.tx ?? 0
+      if (c.durationMs && (c.type === 'open' || c.type === 'close')) {
+        cur.lastSeen = Math.max(cur.lastSeen, c.durationMs)
+      }
+      map.set(key, cur)
+    }
+    return Array.from(map.entries())
+      .map(([target, s]) => ({ target, ...s }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10)
+  }, [conns])
+
+  const maxCount = stats.length > 0 ? stats[0].count : 1
+
+  return (
+    <Card className="rounded-xl border-white/5 bg-slate-900/60 p-5 shadow-lg shadow-black/20">
+      <div className="mb-4 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Gauge className="size-4 text-amber-400" />
+          <h2 className="text-sm font-semibold text-slate-100">目标统计</h2>
+          <span className="text-xs text-slate-500">按连接数 Top 10</span>
+        </div>
+        <span className="text-xs text-slate-500">{stats.length} 个目标</span>
+      </div>
+      {stats.length === 0 ? (
+        <div className="grid h-20 place-items-center text-xs text-slate-600">
+          暂无目标数据 — 产生代理流量后将自动统计
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {stats.map((s, i) => (
+            <div key={s.target} className="group">
+              <div className="mb-1 flex items-center justify-between gap-2 text-xs">
+                <div className="flex min-w-0 items-center gap-2">
+                  <span className="shrink-0 font-mono text-[10px] text-slate-600">#{i + 1}</span>
+                  <span className="truncate font-mono text-slate-300">{s.target}</span>
+                </div>
+                <div className="flex shrink-0 items-center gap-3 font-mono text-[11px]">
+                  <span className="text-slate-400">{s.count} 次</span>
+                  <span className="text-emerald-300/70">↓{formatBytes(s.rx)}</span>
+                  <span className="text-rose-300/70">↑{formatBytes(s.tx)}</span>
+                </div>
+              </div>
+              <div className="h-1.5 overflow-hidden rounded-full bg-slate-800">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-amber-500 to-orange-400 transition-all duration-500"
+                  style={{ width: `${(s.count / maxCount) * 100}%` }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </Card>
   )
 }
@@ -1268,16 +1362,18 @@ export default function Home() {
     connect, disconnect, restart, register, trace, clearLogs, proxyUrl,
   } = warp
 
+  const [timeRange, setTimeRange] = useState(300) // 秒数：60/300/900/1800
+
   const chartData = useMemo(
     () =>
-      history.map((h) => ({
+      history.slice(-timeRange).map((h) => ({
         time: fmtTime(h.t),
         rss: Number(h.rssMB.toFixed(2)),
         cpu: Number(h.cpuPct.toFixed(2)),
         rx: h.rxBytesPerSec,
         tx: h.txBytesPerSec,
       })),
-    [history],
+    [history, timeRange],
   )
 
   const sparkData = useMemo(
@@ -1344,7 +1440,7 @@ export default function Home() {
               history={sparkData}
             />
 
-            <ChartsRow chartData={chartData} />
+            <ChartsRow chartData={chartData} timeRange={timeRange} setTimeRange={setTimeRange} />
 
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
               <WarpControlPanel
@@ -1361,6 +1457,8 @@ export default function Home() {
             <QuickSetupSection />
 
             <ConnectionsTable conns={conns} />
+
+            <TargetStats conns={conns} />
 
             <LogStream logs={logs} onClear={clearLogs} />
 

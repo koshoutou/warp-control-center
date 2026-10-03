@@ -28,7 +28,7 @@ interface CpuTimes { utime: number; stime: number } // 单位：秒
  */
 export class MetricsCollector extends EventEmitter {
   private history: MetricSample[] = []
-  private max = 300 // 5 min @ 1s
+  private max = 1800 // 30 min @ 1s — 支持时间范围选择器 1m/5m/15m/30m
   private timer: NodeJS.Timeout | null = null
   private lastCpu: CpuTimes | null = null
   private lastT = 0
