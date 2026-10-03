@@ -895,24 +895,48 @@ function RuntimeSettings({ settings, onUpdate }: RuntimeSettingsProps) {
                   {val}{f.unit}
                 </span>
               </div>
-              <input
-                type="number"
-                min={f.min}
-                max={f.max}
-                step={f.step}
-                value={val}
-                onChange={(e) => {
-                  const n = Number(e.target.value)
-                  if (Number.isFinite(n)) {
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => {
                     editingRef.current = true
-                    setDraft((d) => ({ ...d, [f.key]: n }))
-                  }
-                }}
-                className={cn(
-                  'h-7 w-full rounded border bg-slate-950/60 px-2 font-mono text-xs text-slate-200 focus:outline-none',
-                  changed ? 'border-amber-500/40 focus:ring-1 focus:ring-amber-500/30' : 'border-white/10 focus:border-amber-500/40'
-                )}
-              />
+                    setDraft((d) => ({ ...d, [f.key]: Math.max(f.min, Number(d[f.key]) - f.step) }))
+                  }}
+                  className="flex size-7 shrink-0 items-center justify-center rounded border border-white/10 bg-slate-800/60 font-mono text-sm text-slate-400 transition-colors hover:bg-slate-700 hover:text-slate-200 active:scale-90"
+                  aria-label="减少"
+                >
+                  −
+                </button>
+                <input
+                  type="number"
+                  min={f.min}
+                  max={f.max}
+                  step={f.step}
+                  value={val}
+                  onChange={(e) => {
+                    const n = Number(e.target.value)
+                    if (Number.isFinite(n)) {
+                      editingRef.current = true
+                      setDraft((d) => ({ ...d, [f.key]: n }))
+                    }
+                  }}
+                  className={cn(
+                    'h-7 w-full min-w-0 rounded border bg-slate-950/60 px-2 text-center font-mono text-xs text-slate-200 focus:outline-none',
+                    changed ? 'border-amber-500/40 focus:ring-1 focus:ring-amber-500/30' : 'border-white/10 focus:border-amber-500/40'
+                  )}
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    editingRef.current = true
+                    setDraft((d) => ({ ...d, [f.key]: Math.min(f.max, Number(d[f.key]) + f.step) }))
+                  }}
+                  className="flex size-7 shrink-0 items-center justify-center rounded border border-white/10 bg-slate-800/60 font-mono text-sm text-slate-400 transition-colors hover:bg-slate-700 hover:text-slate-200 active:scale-90"
+                  aria-label="增加"
+                >
+                  +
+                </button>
+              </div>
               <p className="mt-0.5 text-[9px] text-slate-600">{f.desc}</p>
             </div>
           )
@@ -1096,6 +1120,23 @@ function ConnectionsTable({ conns }: { conns: ConnEvent[] }) {
           <h2 className="text-sm font-semibold text-slate-100">最近连接</h2>
           <span className="text-xs text-slate-500">{conns.length} 条事件</span>
         </div>
+        <button
+          onClick={() => downloadCSV(`warp-conns-${Date.now()}.csv`, conns.map((c) => ({
+            id: c.id,
+            type: c.type,
+            host: c.host ?? '',
+            port: c.port ?? '',
+            rx_bytes: c.rx ?? 0,
+            tx_bytes: c.tx ?? 0,
+            duration_ms: c.durationMs ?? 0,
+            reason: c.reason ?? '',
+          })))}
+          disabled={conns.length === 0}
+          className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/5 px-2 py-1 text-[11px] text-slate-300 transition-colors hover:bg-white/10 disabled:opacity-40 disabled:hover:bg-white/5"
+          title="导出连接记录为 CSV"
+        >
+          <Download className="size-3" /> CSV
+        </button>
       </div>
       <div className="max-h-80 overflow-y-auto rounded-md border border-white/5 [scrollbar-width:thin] [scrollbar-color:#334155_transparent]">
         {/* 桌面端表格 */}
@@ -1618,16 +1659,16 @@ function ComparisonSection() {
             </div>
             <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
               <div className="rounded-md border border-rose-500/20 bg-rose-500/5 p-2.5">
-                <div className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-rose-300/80">
-                  <Boxes className="size-3" /> 原始版
+                <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-rose-300/80">
+                  <Boxes className="size-3 shrink-0" /> 原始版
                 </div>
-                <div className="font-mono text-[13px] leading-relaxed text-slate-400">{row.original}</div>
+                <div className="font-mono text-sm leading-relaxed text-slate-400">{row.original}</div>
               </div>
               <div className="rounded-md border border-emerald-500/25 bg-emerald-500/5 p-2.5">
-                <div className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-emerald-300/90">
-                  <Check className="size-3" /> Node.js 重写版
+                <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-emerald-300/90">
+                  <Check className="size-3 shrink-0" /> Node.js 重写版
                 </div>
-                <div className="font-mono text-[13px] leading-relaxed text-slate-100">{row.node}</div>
+                <div className="font-mono text-sm font-medium leading-relaxed text-emerald-50">{row.node}</div>
               </div>
             </div>
           </div>
@@ -1928,6 +1969,12 @@ export default function Home() {
           { id: 'connect', label: '连接 WARP', hint: 'C', icon: Power, run: () => connect().catch(() => {}) },
           { id: 'disconnect', label: '断开 WARP', hint: 'D', icon: PowerOff, run: () => disconnect().catch(() => {}) },
           { id: 'restart', label: '重启 WARP', hint: 'R', icon: RefreshCw, run: () => restart().catch(() => {}) },
+          { id: 'trace', label: '测试链路', hint: 'T', icon: Terminal, run: () => toast.loading('快捷键已触发，请使用面板按钮查看结果', { duration: 1500 }) },
+          { id: 'clearlogs', label: '清空日志', icon: Trash2, run: () => clearLogs() },
+          { id: 'range1m', label: '时间范围: 1 分钟', icon: Activity, run: () => setTimeRange(60) },
+          { id: 'range5m', label: '时间范围: 5 分钟', icon: Activity, run: () => setTimeRange(300) },
+          { id: 'range15m', label: '时间范围: 15 分钟', icon: Activity, run: () => setTimeRange(900) },
+          { id: 'range30m', label: '时间范围: 30 分钟', icon: Activity, run: () => setTimeRange(1800) },
           { id: 'top', label: '回到顶部', icon: ArrowUp, run: () => window.scrollTo({ top: 0, behavior: 'smooth' }) },
           { id: 'bottom', label: '跳到底部', icon: ArrowDown, run: () => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }) },
         ]}
