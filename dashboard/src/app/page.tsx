@@ -368,6 +368,20 @@ function KpiCard({ title, icon: Icon, iconClass, value, sub, pulse, glow, childr
   )
 }
 
+/* ------------------------------------------------------------------ */
+/*  Trend arrow (module-level component)                               */
+/* ------------------------------------------------------------------ */
+
+function TrendArrow({ delta, unit = '' }: { delta: number; unit?: string }) {
+  if (Math.abs(delta) < 0.01) return null
+  const up = delta > 0
+  return (
+    <span className={cn('inline-flex items-center gap-0.5 text-[9px] font-medium', up ? 'text-amber-400' : 'text-emerald-400')}>
+      {up ? '↑' : '↓'}{Math.abs(delta).toFixed(delta < 1 ? 1 : 0)}{unit}
+    </span>
+  )
+}
+
 function KpiRow({
   warpState, warpDemo, warpVersion, warpRunning, warpPid, warpLastError,
   connsActive, connsTotal, connsRejected,
@@ -395,6 +409,25 @@ function KpiRow({
   history: { rss: number; [k: string]: number | string }[]
 }) {
   const meta = warpStateMeta(warpState)
+  // 趋势：用 history 最后两个点计算（避免 ref/state 复杂性）
+  const h = history
+  const last = h[h.length - 1] as any
+  const prev = h[h.length - 2] as any
+  const trend = prev && last
+    ? {
+        rss: (last.rss as number) - (prev.rss as number),
+      }
+    : { rss: 0 }
+  // 连接/CPU/速率趋势：用 useState 存上次的值（render 安全）
+  const [prevMetrics, setPrevMetrics] = useState({ conns: connsActive, cpu: cpuPct, rx: rxRate, tx: txRate })
+  const trendConns = connsActive - prevMetrics.conns
+  const trendCpu = cpuPct - prevMetrics.cpu
+  const trendRx = rxRate - prevMetrics.rx
+  const trendTx = txRate - prevMetrics.tx
+  useEffect(() => {
+    const id = setTimeout(() => setPrevMetrics({ conns: connsActive, cpu: cpuPct, rx: rxRate, tx: txRate }), 0)
+    return () => clearTimeout(id)
+  }, [connsActive, cpuPct, rxRate, txRate])
   return (
     <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
       <KpiCard
@@ -421,8 +454,9 @@ function KpiRow({
         iconClass="bg-amber-500/10 text-amber-400 ring-1 ring-amber-500/20"
         value={connsActive}
         sub={
-          <span className="flex gap-3">
+          <span className="flex items-center gap-3">
             <span>{connsTotal} 总计</span>
+            {trendConns !== 0 && <TrendArrow delta={trendConns} />}
             {connsRejected > 0 && <span className="text-rose-400">{connsRejected} 已拒绝</span>}
           </span>
         }
@@ -434,8 +468,9 @@ function KpiRow({
         iconClass="bg-orange-500/10 text-orange-400 ring-1 ring-orange-500/20"
         value={`${rssMB.toFixed(1)} MB`}
         sub={
-          <span className="flex gap-3">
+          <span className="flex items-center gap-3">
             <span>堆 {heapUsed.toFixed(1)} / {heapTotal.toFixed(1)} MB</span>
+            {trend.rss !== 0 && <TrendArrow delta={trend.rss} unit="MB" />}
             <span className={cn(cpuPct > 80 ? 'text-rose-400' : cpuPct > 50 ? 'text-amber-400' : 'text-slate-400')}>
               CPU {cpuPct.toFixed(1)}%
             </span>
@@ -476,9 +511,11 @@ function KpiRow({
           </span>
         }
         sub={
-          <span className="flex gap-3">
+          <span className="flex items-center gap-3">
             <span>↓ {formatBytes(rxTotal)}</span>
+            {trendRx !== 0 && <TrendArrow delta={trendRx} />}
             <span>↑ {formatBytes(txTotal)}</span>
+            {trendTx !== 0 && <TrendArrow delta={trendTx} />}
           </span>
         }
       />
@@ -1542,6 +1579,7 @@ interface CommandAction {
   hint?: string
   icon: React.ComponentType<{ className?: string }>
   run: () => void
+  group?: string
 }
 
 function CommandPalette({
@@ -1604,24 +1642,42 @@ function CommandPalette({
           {filtered.length === 0 ? (
             <div className="py-8 text-center text-xs text-slate-600">无匹配命令</div>
           ) : (
-            filtered.map((a, i) => {
-              const Icon = a.icon
-              return (
-                <button
-                  key={a.id}
-                  onMouseEnter={() => setActive(i)}
-                  onClick={() => { a.run(); onClose() }}
-                  className={cn(
-                    'flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm transition-colors',
-                    i === active ? 'bg-amber-500/10 text-amber-200' : 'text-slate-300 hover:bg-white/5'
-                  )}
-                >
-                  <Icon className={cn('size-4', i === active ? 'text-amber-400' : 'text-slate-500')} />
-                  <span className="flex-1">{a.label}</span>
-                  {a.hint && <span className="font-mono text-[10px] text-slate-600">{a.hint}</span>}
-                </button>
-              )
-            })
+            (() => {
+              const groups: { name: string; items: CommandAction[] }[] = []
+              const groupMap = new Map<string, CommandAction[]>()
+              for (const a of filtered) {
+                const g = a.group || '其他'
+                if (!groupMap.has(g)) groupMap.set(g, [])
+                groupMap.get(g)!.push(a)
+              }
+              for (const [name, items] of groupMap) {
+                groups.push({ name, items })
+              }
+              return groups.map((g) => (
+                <div key={g.name}>
+                  <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-slate-600">{g.name}</div>
+                  {g.items.map((a) => {
+                    const i = filtered.indexOf(a)
+                    const Icon = a.icon
+                    return (
+                      <button
+                        key={a.id}
+                        onMouseEnter={() => setActive(i)}
+                        onClick={() => { a.run(); onClose() }}
+                        className={cn(
+                          'flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm transition-colors',
+                          i === active ? 'bg-amber-500/10 text-amber-200' : 'text-slate-300 hover:bg-white/5'
+                        )}
+                      >
+                        <Icon className={cn('size-4', i === active ? 'text-amber-400' : 'text-slate-500')} />
+                        <span className="flex-1">{a.label}</span>
+                        {a.hint && <span className="font-mono text-[10px] text-slate-600">{a.hint}</span>}
+                      </button>
+                    )
+                  })}
+                </div>
+              ))
+            })()
           )}
         </div>
         <div className="flex items-center justify-between border-t border-white/5 px-4 py-2 text-[10px] text-slate-600">
@@ -1840,9 +1896,13 @@ export default function Home() {
     return () => window.removeEventListener('keydown', onKey)
   }, [loading, connect, disconnect, restart])
 
-  // 运行时长计时
+  // 运行时长计时（基于后端进程启动时间）
   const startTimeRef = useRef(Date.now())
   useEffect(() => {
+    warp.getUptime().then((u: any) => {
+      startTimeRef.current = u.startedAt
+      setUptime((Date.now() - u.startedAt) / 1000)
+    }).catch(() => {})
     const id = setInterval(() => setUptime((Date.now() - startTimeRef.current) / 1000), 1000)
     return () => clearInterval(id)
   }, [])
@@ -1966,17 +2026,17 @@ export default function Home() {
         open={cmdOpen}
         onClose={() => setCmdOpen(false)}
         actions={[
-          { id: 'connect', label: '连接 WARP', hint: 'C', icon: Power, run: () => connect().catch(() => {}) },
-          { id: 'disconnect', label: '断开 WARP', hint: 'D', icon: PowerOff, run: () => disconnect().catch(() => {}) },
-          { id: 'restart', label: '重启 WARP', hint: 'R', icon: RefreshCw, run: () => restart().catch(() => {}) },
-          { id: 'trace', label: '测试链路', hint: 'T', icon: Terminal, run: () => toast.loading('快捷键已触发，请使用面板按钮查看结果', { duration: 1500 }) },
-          { id: 'clearlogs', label: '清空日志', icon: Trash2, run: () => clearLogs() },
-          { id: 'range1m', label: '时间范围: 1 分钟', icon: Activity, run: () => setTimeRange(60) },
-          { id: 'range5m', label: '时间范围: 5 分钟', icon: Activity, run: () => setTimeRange(300) },
-          { id: 'range15m', label: '时间范围: 15 分钟', icon: Activity, run: () => setTimeRange(900) },
-          { id: 'range30m', label: '时间范围: 30 分钟', icon: Activity, run: () => setTimeRange(1800) },
-          { id: 'top', label: '回到顶部', icon: ArrowUp, run: () => window.scrollTo({ top: 0, behavior: 'smooth' }) },
-          { id: 'bottom', label: '跳到底部', icon: ArrowDown, run: () => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }) },
+          { id: 'connect', label: '连接 WARP', hint: 'C', icon: Power, group: 'WARP 操作', run: () => connect().catch(() => {}) },
+          { id: 'disconnect', label: '断开 WARP', hint: 'D', icon: PowerOff, group: 'WARP 操作', run: () => disconnect().catch(() => {}) },
+          { id: 'restart', label: '重启 WARP', hint: 'R', icon: RefreshCw, group: 'WARP 操作', run: () => restart().catch(() => {}) },
+          { id: 'trace', label: '测试链路', hint: 'T', icon: Terminal, group: 'WARP 操作', run: () => toast.loading('快捷键已触发，请使用面板按钮查看结果', { duration: 1500 }) },
+          { id: 'clearlogs', label: '清空日志', icon: Trash2, group: '操作', run: () => clearLogs() },
+          { id: 'range1m', label: '时间范围: 1 分钟', icon: Activity, group: '时间范围', run: () => setTimeRange(60) },
+          { id: 'range5m', label: '时间范围: 5 分钟', icon: Activity, group: '时间范围', run: () => setTimeRange(300) },
+          { id: 'range15m', label: '时间范围: 15 分钟', icon: Activity, group: '时间范围', run: () => setTimeRange(900) },
+          { id: 'range30m', label: '时间范围: 30 分钟', icon: Activity, group: '时间范围', run: () => setTimeRange(1800) },
+          { id: 'top', label: '回到顶部', icon: ArrowUp, group: '导航', run: () => window.scrollTo({ top: 0, behavior: 'smooth' }) },
+          { id: 'bottom', label: '跳到底部', icon: ArrowDown, group: '导航', run: () => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }) },
         ]}
       />
 

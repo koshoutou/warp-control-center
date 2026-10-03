@@ -27,6 +27,7 @@ const logger = new Logger(config.logBufferSize)
 const metrics = new MetricsCollector()
 const warp = new WarpManager(config, logger)
 const proxy = createProxyServer({ config, warp, logger, metrics })
+const startedAt = Date.now()
 
 // ---- HTTP + WS server (port 3030 — control plane) --------------------------
 //
@@ -57,7 +58,7 @@ io.engine.use((req: any, res: any, next: any) => {
   }
   const u = new URL(req.url || '/', 'http://localhost')
   if (u.pathname.startsWith('/api/') || u.pathname === '/api/health') {
-    handleApi(req, res, { config, warp, proxy, metrics, logger }).catch((e) => {
+    handleApi(req, res, { config, warp, proxy, metrics, logger, startedAt }).catch((e) => {
       res.writeHead?.(500, { 'Content-Type': 'application/json' })
       res.end?.(JSON.stringify({ error: (e as Error).message }))
     })

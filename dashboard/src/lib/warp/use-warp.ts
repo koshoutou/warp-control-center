@@ -39,6 +39,7 @@ export interface WarpHookState {
   register: (license: string) => Promise<void>
   trace: () => Promise<TraceResult | null>
   getSettings: () => Promise<any>
+  getUptime: () => Promise<{ startedAt: number; uptime: number }>
   updateSettings: (s: Record<string, number>) => Promise<{ applied: Record<string, boolean>; reasons: Record<string, string> }>
   clearLogs: () => void
   proxyUrl: string
@@ -161,6 +162,9 @@ export function useWarp(): WarpHookState {
   const getSettings = useCallback(async () => {
     return (await call('/api/warp/settings', 'GET'))
   }, [call])
+  const getUptime = useCallback(async () => {
+    return (await call('/api/uptime', 'GET'))
+  }, [call])
   const updateSettings = useCallback(async (s: Record<string, number>) => {
     const res = await call('/api/warp/settings', 'PUT', s)
     const changes = res.changes || {}
@@ -191,6 +195,7 @@ export function useWarp(): WarpHookState {
     register,
     trace,
     getSettings,
+    getUptime,
     updateSettings,
     clearLogs,
     proxyUrl: `socks5h://127.0.0.1:${PROXY_PORT}`,

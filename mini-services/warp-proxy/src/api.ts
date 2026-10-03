@@ -5,7 +5,7 @@ import type { ProxyServer } from './proxy-server.js'
 import type { MetricsCollector } from './metrics.js'
 import type { Logger } from './logger.js'
 
-interface Ctx { config: Config; warp: WarpManager; proxy: ProxyServer; metrics: MetricsCollector; logger: Logger }
+interface Ctx { config: Config; warp: WarpManager; proxy: ProxyServer; metrics: MetricsCollector; logger: Logger; startedAt: number }
 
 /** Tiny REST router. All paths under /api/... */
 export async function handleApi(req: IncomingMessage, res: ServerResponse, ctx: Ctx) {
@@ -113,7 +113,16 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, ctx: 
         }
       }
       ctx.logger.info('api', `settings PUT: ${JSON.stringify(changes)}`)
+      // 持久化到文件（仅当至少一项 applied 时）
+      const anyApplied = Object.values(changes).some((c) => (c as any).applied)
+      if (anyApplied) {
+        ctx.config.persist?.()
+        ctx.logger.info('api', 'settings 已持久化到文件')
+      }
       return send(200, { ok: true, changes })
+    }
+    if (path === '/api/uptime' && req.method === 'GET') {
+      return send(200, { startedAt: ctx.startedAt, uptime: Math.floor((Date.now() - ctx.startedAt) / 1000) })
     }
     if (path === '/api/health' && req.method === 'GET') {
       return send(200, { ok: true, t: Date.now() })
