@@ -47,6 +47,16 @@ export class MetricsCollector extends EventEmitter {
     this.timer.unref?.()
   }
 
+  /** 动态调整采集间隔（毫秒） */
+  setInterval(ms: number) {
+    if (!Number.isFinite(ms) || ms < 500 || ms > 60000) return
+    if (this.timer) clearInterval(this.timer)
+    this.lastCpu = this.readCpu()
+    this.lastT = Date.now()
+    this.timer = setInterval(() => this.tick(), ms)
+    this.timer.unref?.()
+  }
+
   private tick() {
     if (!this.sampler) return
     const now = Date.now()

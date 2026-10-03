@@ -60,6 +60,61 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, ctx: 
       const r = await ctx.warp.trace()
       return send(r.ok ? 200 : 502, r)
     }
+    if (path === '/api/warp/settings' && req.method === 'GET') {
+      return send(200, {
+        maxConnections: ctx.config.maxConnections,
+        idleTimeoutMs: ctx.config.idleTimeoutMs,
+        metricsIntervalMs: ctx.config.metricsIntervalMs,
+        logBufferSize: ctx.config.logBufferSize,
+        autoConnect: ctx.config.autoConnect,
+        licenseConfigured: !!ctx.config.license,
+      })
+    }
+    if (path === '/api/warp/settings' && req.method === 'PUT') {
+      const body = JSON.parse((await readBody()) || '{}')
+      const changes: Record<string, { from: unknown; to: unknown; applied: boolean; reason?: string }> = {}
+      // 可运行时修改的配置项
+      if (body.maxConnections != null) {
+        const v = Number(body.maxConnections)
+        if (Number.isFinite(v) && v >= 1 && v <= 100000) {
+          changes.maxConnections = { from: ctx.config.maxConnections, to: v, applied: true }
+          ctx.config.maxConnections = v
+        } else {
+          changes.maxConnections = { from: ctx.config.maxConnections, to: body.maxConnections, applied: false, reason: '需为 1-100000 的数字' }
+        }
+      }
+      if (body.idleTimeoutMs != null) {
+        const v = Number(body.idleTimeoutMs)
+        if (Number.isFinite(v) && v >= 5000 && v <= 3600000) {
+          changes.idleTimeoutMs = { from: ctx.config.idleTimeoutMs, to: v, applied: true }
+          ctx.config.idleTimeoutMs = v
+        } else {
+          changes.idleTimeoutMs = { from: ctx.config.idleTimeoutMs, to: body.idleTimeoutMs, applied: false, reason: '需为 5000-3600000 的毫秒数' }
+        }
+      }
+      if (body.metricsIntervalMs != null) {
+        const v = Number(body.metricsIntervalMs)
+        if (Number.isFinite(v) && v >= 500 && v <= 60000) {
+          changes.metricsIntervalMs = { from: ctx.config.metricsIntervalMs, to: v, applied: true }
+          ctx.config.metricsIntervalMs = v
+          ctx.metrics.setInterval?.(v)
+        } else {
+          changes.metricsIntervalMs = { from: ctx.config.metricsIntervalMs, to: body.metricsIntervalMs, applied: false, reason: '需为 500-60000 的毫秒数' }
+        }
+      }
+      if (body.logBufferSize != null) {
+        const v = Number(body.logBufferSize)
+        if (Number.isFinite(v) && v >= 50 && v <= 10000) {
+          changes.logBufferSize = { from: ctx.config.logBufferSize, to: v, applied: true }
+          ctx.config.logBufferSize = v
+          ctx.logger.setMax?.(v)
+        } else {
+          changes.logBufferSize = { from: ctx.config.logBufferSize, to: body.logBufferSize, applied: false, reason: '需为 50-10000 的数字' }
+        }
+      }
+      ctx.logger.info('api', `settings PUT: ${JSON.stringify(changes)}`)
+      return send(200, { ok: true, changes })
+    }
     if (path === '/api/health' && req.method === 'GET') {
       return send(200, { ok: true, t: Date.now() })
     }

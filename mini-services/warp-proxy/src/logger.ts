@@ -32,4 +32,10 @@ export class Logger extends EventEmitter {
 
   history(): LogLine[] { return [...this.buf] }
   recent(limit = 200): LogLine[] { return this.buf.slice(-limit) }
+
+  /** 动态调整缓冲区大小 */
+  setMax(max: number) {
+    this.max = max
+    while (this.buf.length > this.max) this.buf.shift()
+  }
 }

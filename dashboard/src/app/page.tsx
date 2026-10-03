@@ -11,7 +11,7 @@ import {
   Shield, Globe, Network, MemoryStick, ArrowDownUp, ArrowDown, ArrowUp,
   Power, PowerOff, RefreshCw, Terminal, Trash2, Copy, Check,
   Loader2, Activity, CircleAlert, ChevronDown, Zap, KeyRound,
-  Boxes, Scale, Gauge, Download, Search,
+  Boxes, Scale, Gauge, Download, Search, SlidersHorizontal, ArrowUpDown,
 } from 'lucide-react'
 import {
   AreaChart, Area, Line, XAxis, YAxis, CartesianGrid,
@@ -46,6 +46,17 @@ import {
   Tooltip as UiTooltip, TooltipContent, TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
+
+/* ------------------------------------------------------------------ */
+/*  Section: Runtime settings types                                     */
+/* ------------------------------------------------------------------ */
+
+interface RuntimeSettingsData {
+  maxConnections: number
+  idleTimeoutMs: number
+  metricsIntervalMs: number
+  logBufferSize: number
+}
 
 /* ------------------------------------------------------------------ */
 /*  Format helpers                                                     */
@@ -783,8 +794,154 @@ interface ConfigRow {
   value: string | number | boolean
 }
 
+/* ------------------------------------------------------------------ */
+/*  Section: Runtime settings editor                                   */
+/* ------------------------------------------------------------------ */
+
+interface RuntimeSettingsProps {
+  settings: { maxConnections: number; idleTimeoutMs: number; metricsIntervalMs: number; logBufferSize: number }
+  onUpdate: (s: Record<string, number>) => Promise<{ applied: Record<string, boolean>; reasons: Record<string, string> }>
+}
+
+function RuntimeSettings({ settings, onUpdate }: RuntimeSettingsProps) {
+  const [draft, setDraft] = useState({
+    maxConnections: settings.maxConnections,
+    idleTimeoutMs: settings.idleTimeoutMs,
+    metricsIntervalMs: settings.metricsIntervalMs,
+    logBufferSize: settings.logBufferSize,
+  })
+  const [saving, setSaving] = useState(false)
+  const [feedback, setFeedback] = useState<{ ok: boolean; msg: string } | null>(null)
+  const editingRef = useRef(false)
+
+  // 当 settings prop 变化时同步 draft（但用户正在编辑时不覆盖）
+  useEffect(() => {
+    if (editingRef.current) return
+    setDraft({
+      maxConnections: settings.maxConnections,
+      idleTimeoutMs: settings.idleTimeoutMs,
+      metricsIntervalMs: settings.metricsIntervalMs,
+      logBufferSize: settings.logBufferSize,
+    })
+  }, [settings])
+
+  const dirty = (['maxConnections', 'idleTimeoutMs', 'metricsIntervalMs', 'logBufferSize'] as const)
+    .some((k) => draft[k] !== settings[k])
+
+  const save = async () => {
+    setSaving(true)
+    setFeedback(null)
+    const changes: Record<string, number> = {}
+    for (const k of ['maxConnections', 'idleTimeoutMs', 'metricsIntervalMs', 'logBufferSize'] as const) {
+      if (draft[k] !== settings[k]) changes[k] = draft[k]
+    }
+    try {
+      const { applied, reasons } = await onUpdate(changes)
+      const failed = Object.entries(applied).filter(([, v]) => !v)
+      if (failed.length === 0) {
+        toast.success('配置已更新', { description: Object.keys(changes).join(', ') })
+        setFeedback({ ok: true, msg: '已应用' })
+      } else {
+        const msg = failed.map(([k]) => `${k}: ${reasons[k] || '验证失败'}`).join('；')
+        toast.error('部分配置更新失败', { description: msg })
+        setFeedback({ ok: false, msg })
+      }
+    } catch (e) {
+      toast.error('更新失败', { description: (e as Error).message })
+      setFeedback({ ok: false, msg: (e as Error).message })
+    } finally {
+      setSaving(false)
+      editingRef.current = false
+      setTimeout(() => setFeedback(null), 3000)
+    }
+  }
+
+  const reset = () => {
+    editingRef.current = false
+    setDraft({
+      maxConnections: settings.maxConnections,
+      idleTimeoutMs: settings.idleTimeoutMs,
+      metricsIntervalMs: settings.metricsIntervalMs,
+      logBufferSize: settings.logBufferSize,
+    })
+    setFeedback(null)
+  }
+
+  const fields: { key: keyof typeof draft; label: string; min: number; max: number; step: number; unit: string; desc: string }[] = [
+    { key: 'maxConnections', label: '最大连接数', min: 1, max: 100000, step: 1, unit: '', desc: '并发连接上限' },
+    { key: 'idleTimeoutMs', label: '空闲超时', min: 5000, max: 3600000, step: 1000, unit: 'ms', desc: '连接空闲多久后关闭' },
+    { key: 'metricsIntervalMs', label: '采集间隔', min: 500, max: 60000, step: 500, unit: 'ms', desc: '指标采集频率' },
+    { key: 'logBufferSize', label: '日志缓冲', min: 50, max: 10000, step: 50, unit: '行', desc: '日志环形缓冲区大小' },
+  ]
+
+  return (
+    <div className="space-y-2.5">
+      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+        {fields.map((f) => {
+          const val = draft[f.key]
+          const changed = val !== settings[f.key]
+          return (
+            <div key={f.key} className="rounded-md border border-white/5 bg-slate-950/40 p-2">
+              <div className="mb-1 flex items-center justify-between">
+                <label className="text-[10px] font-medium text-slate-400">{f.label}</label>
+                <span className={cn('font-mono text-[10px]', changed ? 'text-amber-300' : 'text-slate-500')}>
+                  {val}{f.unit}
+                </span>
+              </div>
+              <input
+                type="number"
+                min={f.min}
+                max={f.max}
+                step={f.step}
+                value={val}
+                onChange={(e) => {
+                  const n = Number(e.target.value)
+                  if (Number.isFinite(n)) {
+                    editingRef.current = true
+                    setDraft((d) => ({ ...d, [f.key]: n }))
+                  }
+                }}
+                className={cn(
+                  'h-7 w-full rounded border bg-slate-950/60 px-2 font-mono text-xs text-slate-200 focus:outline-none',
+                  changed ? 'border-amber-500/40 focus:ring-1 focus:ring-amber-500/30' : 'border-white/10 focus:border-amber-500/40'
+                )}
+              />
+              <p className="mt-0.5 text-[9px] text-slate-600">{f.desc}</p>
+            </div>
+          )
+        })}
+      </div>
+      <div className="flex items-center gap-2">
+        <Button
+          size="sm"
+          onClick={save}
+          disabled={!dirty || saving}
+          className="h-7 bg-amber-600 text-white hover:bg-amber-500 disabled:opacity-40"
+        >
+          {saving ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5" />}
+          保存
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={reset}
+          disabled={!dirty || saving}
+          className="h-7 text-xs text-slate-400 hover:bg-white/5 disabled:opacity-40"
+        >
+          重置
+        </Button>
+        {feedback && (
+          <span className={cn('text-[10px]', feedback.ok ? 'text-emerald-400' : 'text-rose-400')}>
+            {feedback.ok ? '✓' : '✗'} {feedback.msg.slice(0, 40)}
+          </span>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function ConfigPanel({
-  config, proxyUrl, warp,
+  config, proxyUrl, warp, settings, onUpdateSettings,
 }: {
   config: {
     proxyPort: number
@@ -806,6 +963,8 @@ function ConfigPanel({
     pid?: number
     lastChecked: number
   } | null
+  settings: { maxConnections: number; idleTimeoutMs: number; metricsIntervalMs: number; logBufferSize: number } | null
+  onUpdateSettings: (s: Record<string, number>) => Promise<{ applied: Record<string, boolean>; reasons: Record<string, string> }>
 }) {
   const rows: ConfigRow[] = config
     ? [
@@ -862,6 +1021,19 @@ function ConfigPanel({
 
       <Separator className="bg-white/5" />
 
+      {/* 运行时可编辑配置 */}
+      <div className="space-y-2">
+        <div className="flex items-center gap-1.5">
+          <SlidersHorizontal className="size-3.5 text-amber-400" />
+          <span className="text-[11px] font-medium uppercase tracking-wider text-slate-400">运行时配置</span>
+        </div>
+        {settings ? (
+          <RuntimeSettings settings={settings} onUpdate={onUpdateSettings} />
+        ) : (
+          <div className="text-xs text-slate-600">加载中…</div>
+        )}
+      </div>
+
       <div className="mt-auto space-y-2">
         <Label className="text-xs text-slate-400">代理地址</Label>
         <div className="flex items-center gap-2 rounded-md border border-amber-500/20 bg-amber-500/5 px-3 py-2">
@@ -889,7 +1061,26 @@ function ConfigPanel({
 /* ------------------------------------------------------------------ */
 
 function ConnectionsTable({ conns }: { conns: ConnEvent[] }) {
-  const rows = conns.slice(0, 15)
+  const [sortKey, setSortKey] = useState<'time' | 'rx' | 'tx' | 'duration'>('time')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+  const sortedConns = useMemo(() => {
+    const arr = [...conns]
+    if (sortKey === 'time') {
+      arr.sort((a, b) => sortDir === 'desc' ? b.id - a.id : a.id - b.id)
+    } else if (sortKey === 'rx') {
+      arr.sort((a, b) => sortDir === 'desc' ? (b.rx ?? 0) - (a.rx ?? 0) : (a.rx ?? 0) - (b.rx ?? 0))
+    } else if (sortKey === 'tx') {
+      arr.sort((a, b) => sortDir === 'desc' ? (b.tx ?? 0) - (a.tx ?? 0) : (a.tx ?? 0) - (b.tx ?? 0))
+    } else if (sortKey === 'duration') {
+      arr.sort((a, b) => sortDir === 'desc' ? (b.durationMs ?? 0) - (a.durationMs ?? 0) : (a.durationMs ?? 0) - (b.durationMs ?? 0))
+    }
+    return arr
+  }, [conns, sortKey, sortDir])
+  const rows = sortedConns.slice(0, 15)
+  const toggleSort = (k: 'time' | 'rx' | 'tx' | 'duration') => {
+    if (sortKey === k) setSortDir(d => d === 'desc' ? 'asc' : 'desc')
+    else { setSortKey(k); setSortDir('desc') }
+  }
   return (
     <Card className="rounded-xl border-white/5 bg-slate-900/60 p-5 shadow-lg shadow-black/20">
       <div className="mb-4 flex items-center justify-between">
@@ -905,12 +1096,28 @@ function ConnectionsTable({ conns }: { conns: ConnEvent[] }) {
         <Table>
           <TableHeader className="sticky top-0 z-10 bg-slate-900/95 backdrop-blur">
             <TableRow className="border-white/5 hover:bg-transparent">
-              <TableHead className="h-9 pl-3 text-[11px] uppercase tracking-wider text-slate-500">ID</TableHead>
+              <TableHead className="h-9 pl-3 text-[11px] uppercase tracking-wider text-slate-500">
+                <button onClick={() => toggleSort('time')} className="inline-flex items-center gap-1 hover:text-slate-300">
+                  ID {sortKey === 'time' && (sortDir === 'desc' ? '↓' : '↑')}
+                </button>
+              </TableHead>
               <TableHead className="h-9 text-[11px] uppercase tracking-wider text-slate-500">类型</TableHead>
               <TableHead className="h-9 text-[11px] uppercase tracking-wider text-slate-500">目标</TableHead>
-              <TableHead className="h-9 text-right text-[11px] uppercase tracking-wider text-slate-500">↓ 接收</TableHead>
-              <TableHead className="h-9 text-right text-[11px] uppercase tracking-wider text-slate-500">↑ 发送</TableHead>
-              <TableHead className="h-9 text-right text-[11px] uppercase tracking-wider text-slate-500">持续时间</TableHead>
+              <TableHead className="h-9 text-right text-[11px] uppercase tracking-wider text-slate-500">
+                <button onClick={() => toggleSort('rx')} className="inline-flex items-center gap-1 hover:text-slate-300">
+                  ↓ 接收 {sortKey === 'rx' && (sortDir === 'desc' ? '↓' : '↑')}
+                </button>
+              </TableHead>
+              <TableHead className="h-9 text-right text-[11px] uppercase tracking-wider text-slate-500">
+                <button onClick={() => toggleSort('tx')} className="inline-flex items-center gap-1 hover:text-slate-300">
+                  ↑ 发送 {sortKey === 'tx' && (sortDir === 'desc' ? '↓' : '↑')}
+                </button>
+              </TableHead>
+              <TableHead className="h-9 text-right text-[11px] uppercase tracking-wider text-slate-500">
+                <button onClick={() => toggleSort('duration')} className="inline-flex items-center gap-1 hover:text-slate-300">
+                  持续时间 {sortKey === 'duration' && (sortDir === 'desc' ? '↓' : '↑')}
+                </button>
+              </TableHead>
               <TableHead className="h-9 pr-3 text-[11px] uppercase tracking-wider text-slate-500">原因</TableHead>
             </TableRow>
           </TableHeader>
@@ -1415,6 +1622,7 @@ export default function Home() {
   } = warp
 
   const [timeRange, setTimeRange] = useState(300) // 秒数：60/300/900/1800
+  const [runtimeSettings, setRuntimeSettings] = useState<RuntimeSettingsData | null>(null)
 
   const chartData = useMemo(
     () =>
@@ -1449,6 +1657,25 @@ export default function Home() {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [loading, connect, disconnect, restart])
+
+  // 加载运行时配置
+  useEffect(() => {
+    if (loading) return
+    const fetchSettings = () => {
+      warp.getSettings().then((s: any) => {
+        setRuntimeSettings({
+          maxConnections: s.maxConnections,
+          idleTimeoutMs: s.idleTimeoutMs,
+          metricsIntervalMs: s.metricsIntervalMs,
+          logBufferSize: s.logBufferSize,
+        })
+      }).catch(() => {})
+    }
+    fetchSettings()
+    // 每 10 秒刷新一次
+    const id = setInterval(fetchSettings, 10000)
+    return () => clearInterval(id)
+  }, [loading])
 
   return (
     <div className="dark flex min-h-screen flex-col bg-slate-950 text-slate-100">
@@ -1503,7 +1730,23 @@ export default function Home() {
                 trace={trace}
                 warpDemo={warpStatus?.demo ?? false}
               />
-              <ConfigPanel config={config} proxyUrl={proxyUrl} warp={warpStatus} />
+              <ConfigPanel
+                config={config}
+                proxyUrl={proxyUrl}
+                warp={warpStatus}
+                settings={runtimeSettings}
+                onUpdateSettings={async (s) => {
+                  const r = await warp.updateSettings(s)
+                  // 更新后立即刷新
+                  warp.getSettings().then((ns: any) => setRuntimeSettings({
+                    maxConnections: ns.maxConnections,
+                    idleTimeoutMs: ns.idleTimeoutMs,
+                    metricsIntervalMs: ns.metricsIntervalMs,
+                    logBufferSize: ns.logBufferSize,
+                  }))
+                  return r
+                }}
+              />
             </div>
 
             <QuickSetupSection />
