@@ -1,0 +1,47 @@
+# ====================================================================
+# WARP 控制中心 —— 前端面板 systemd 服务
+# 部署: sudo cp deploy/systemd/warp-dashboard.service /etc/systemd/system/
+# 启动: sudo systemctl enable --now warp-dashboard
+# ====================================================================
+[Unit]
+Description=WARP 控制中心 - 前端面板（Next.js）
+Documentation=https://github.com/koshoutou/warp-control-center
+After=network-online.target warp-proxy.service
+Wants=network-online.target
+Requires=warp-proxy.service
+
+[Service]
+Type=simple
+User=root
+Group=root
+
+# 工作目录（构建后的 standalone 产物）
+WorkingDirectory=/opt/warp-control-center/dashboard
+
+# 环境变量
+Environment=NODE_ENV=production
+Environment=HOSTNAME=0.0.0.0
+Environment=PORT=3000
+# 同源模式：由 Nginx 反代路由 /api/* 到 :3030
+Environment=NEXT_PUBLIC_WARP_API_BASE=
+EnvironmentFile=-/etc/warp-control-center.env
+
+# 启动命令（Next.js standalone 产物）
+ExecStart=/usr/bin/node /opt/warp-control-center/dashboard/.next/standalone/server.js
+
+# 自动重启
+Restart=on-failure
+RestartSec=5s
+
+# 资源限制
+LimitNOFILE=65536
+MemoryMax=256M
+CPUQuota=50%
+
+# 日志
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=warp-dashboard
+
+[Install]
+WantedBy=multi-user.target
