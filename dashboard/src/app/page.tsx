@@ -557,13 +557,13 @@ function ChartsRow({ chartData, timeRange, setTimeRange }: {
                     <stop offset="100%" stopColor="#f59e0b" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#334155" strokeOpacity={0.5} />
                 <XAxis dataKey="time" stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} minTickGap={48} />
                 <YAxis yAxisId="rss" stroke="#f59e0b" fontSize={10} tickLine={false} axisLine={false} width={38} allowDecimals={false} />
                 <YAxis yAxisId="cpu" orientation="right" stroke="#fb923c" fontSize={10} tickLine={false} axisLine={false} width={32} unit="%" domain={[0, 100]} allowDecimals={false} ticks={[0, 25, 50, 75, 100]} />
                 <RTooltip contentStyle={tooltipStyle} labelStyle={{ color: '#94a3b8', fontSize: 11 }} itemStyle={{ color: '#e2e8f0' }} />
-                <Area yAxisId="rss" type="monotone" dataKey="rss" name="RSS (MB)" stroke="#f59e0b" strokeWidth={2} fill="url(#rssArea)" isAnimationActive={false} />
-                <Line yAxisId="cpu" type="monotone" dataKey="cpu" name="CPU (%)" stroke="#fb923c" strokeWidth={2} dot={false} isAnimationActive={false} />
+                <Area yAxisId="rss" type="monotone" dataKey="rss" name="RSS (MB)" stroke="#f59e0b" strokeWidth={2} fill="url(#rssArea)" isAnimationActive animationDuration={300} animationEasing="ease-out" />
+                <Line yAxisId="cpu" type="monotone" dataKey="cpu" name="CPU (%)" stroke="#fb923c" strokeWidth={2} dot={false} isAnimationActive animationDuration={300} animationEasing="ease-out" />
               </AreaChart>
             </ResponsiveContainer>
           )}
@@ -601,7 +601,7 @@ function ChartsRow({ chartData, timeRange, setTimeRange }: {
                     <stop offset="100%" stopColor="#f43f5e" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#334155" strokeOpacity={0.5} />
                 <XAxis dataKey="time" stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} minTickGap={48} />
                 <YAxis stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} width={56} allowDecimals={false} tickFormatter={(v: number) => formatRate(Number(v))} />
                 <RTooltip
@@ -610,8 +610,8 @@ function ChartsRow({ chartData, timeRange, setTimeRange }: {
                   itemStyle={{ color: '#e2e8f0' }}
                   formatter={(value: number | string, name: string) => [formatRate(Number(value)), name]}
                 />
-                <Area type="monotone" dataKey="rx" name="↓ 接收" stroke="#f59e0b" strokeWidth={2} fill="url(#rxArea)" isAnimationActive={false} />
-                <Area type="monotone" dataKey="tx" name="↑ 发送" stroke="#f43f5e" strokeWidth={2} fill="url(#txArea)" isAnimationActive={false} />
+                <Area type="monotone" dataKey="rx" name="↓ 接收" stroke="#f59e0b" strokeWidth={2} fill="url(#rxArea)" isAnimationActive animationDuration={300} animationEasing="ease-out" />
+                <Area type="monotone" dataKey="tx" name="↑ 发送" stroke="#f43f5e" strokeWidth={2} fill="url(#txArea)" isAnimationActive animationDuration={300} animationEasing="ease-out" />
               </AreaChart>
             </ResponsiveContainer>
           )}
@@ -706,7 +706,7 @@ function WarpControlPanel({
         <Button
           onClick={() => run('connect', '连接 WARP', connect)}
           disabled={busy !== null}
-          className="bg-emerald-600 text-white hover:bg-emerald-500"
+          className="bg-emerald-600 text-white transition-all hover:bg-emerald-500 hover:shadow-lg hover:shadow-emerald-500/30 active:scale-95"
         >
           {busy === 'connect' ? <Loader2 className="size-4 animate-spin" /> : <Power className="size-4" />}
           连接
@@ -715,7 +715,7 @@ function WarpControlPanel({
           onClick={() => run('disconnect', '断开 WARP', disconnect)}
           disabled={busy !== null}
           variant="secondary"
-          className="bg-slate-700 text-slate-100 hover:bg-slate-600"
+          className="bg-slate-700 text-slate-100 transition-all hover:bg-slate-600 hover:shadow-lg hover:shadow-slate-500/20 active:scale-95"
         >
           {busy === 'disconnect' ? <Loader2 className="size-4 animate-spin" /> : <PowerOff className="size-4" />}
           断开
@@ -724,7 +724,7 @@ function WarpControlPanel({
           onClick={() => run('restart', '重启 WARP', restart)}
           disabled={busy !== null}
           variant="outline"
-          className="border-amber-500/40 bg-amber-500/5 text-amber-300 hover:bg-amber-500/10"
+          className="border-amber-500/40 bg-amber-500/5 text-amber-300 transition-all hover:bg-amber-500/10 hover:shadow-md hover:shadow-amber-500/20 active:scale-95"
         >
           {busy === 'restart' ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
           重启
@@ -733,7 +733,7 @@ function WarpControlPanel({
           onClick={handleTrace}
           disabled={busy !== null}
           variant="outline"
-          className="border-white/10 bg-white/5 text-slate-200 hover:bg-white/10"
+          className="border-white/10 bg-white/5 text-slate-200 transition-all hover:bg-white/10 hover:shadow-md hover:shadow-white/10 active:scale-95"
         >
           {busy === 'trace' ? <Loader2 className="size-4 animate-spin" /> : <Terminal className="size-4" />}
           测试链路
@@ -1137,7 +1137,7 @@ function ConnectionsTable({ conns }: { conns: ConnEvent[] }) {
                 const m = connTypeMeta(c.type)
                 const target = c.host ? `${c.host}${c.port ? ':' + c.port : ''}` : ''
                 return (
-                  <TableRow key={`${c.id}-${i}`} className="border-white/5 transition-colors hover:bg-white/[0.03]">
+                  <TableRow key={`${c.id}-${i}`} className="border-white/5 transition-colors hover:bg-amber-500/[0.06] hover:shadow-[inset_2px_0_0_0_#f59e0b]">
                     <TableCell className="pl-3 font-mono text-xs text-slate-400">#{c.id}</TableCell>
                     <TableCell>
                       <span className={cn('inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] font-medium', m.cls)}>
@@ -1369,7 +1369,7 @@ function LogStream({ logs, onClear }: { logs: LogLine[]; onClear: () => void }) 
           filteredLogs.map((l, i) => {
             const m = logLevelMeta(l.level)
             return (
-              <div key={i} className="flex items-start gap-2 py-0.5">
+              <div key={l.t + '_' + i} className="log-fade-in flex items-start gap-2 py-0.5">
                 <span className="shrink-0 font-mono text-slate-600">{fmtTime(l.t).slice(0,5)}<span className="sm:inline hidden">{fmtTime(l.t).slice(5)}</span></span>
                 <span className={cn('shrink-0 rounded px-1 text-[10px] font-semibold uppercase', m.bg, m.tag)}>
                   {l.level}

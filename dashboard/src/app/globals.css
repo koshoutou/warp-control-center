@@ -139,3 +139,12 @@
 .data-pulse {
   animation: data-pulse 0.8s ease-out;
 }
+
+/* 日志行淡入动画 */
+@keyframes log-fade-in {
+  0% { opacity: 0; transform: translateY(-2px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+.log-fade-in {
+  animation: log-fade-in 0.3s ease-out;
+}
